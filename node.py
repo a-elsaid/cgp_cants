@@ -22,6 +22,7 @@ class Node():
         self.id = Node.count + 1
         Node.count += 1
         self.lag = None
+        self.z = point.get_z()
         self.__cluster = None
         self.type = type                   # 0 = normal, 1 = input, 2 = output
         self.functions = {}
@@ -141,6 +142,7 @@ class Node():
                 edge.source.outbound_edges.remove(edge)
 
     def adjust_lag(self, lags):
-        z = self.point.get_z() * 10
+        point_z = self.point.get_z() * 10
         lag_step = 10/(lags)
-        self.lag = round((z/lag_step))
+        self.lag = round((point_z/lag_step))
+        self.z = self.lag * lag_step * 0.1

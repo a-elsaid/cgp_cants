@@ -133,18 +133,16 @@ def test_ants(num_ants=10):
     for ant in ants:
         ant.march()
     paths = [ant.path for ant in ants]  
-    graph = Graph(ants_paths = paths)
-    
-    graph.visualize_graph()
+    graph = Graph(ants_paths = paths, space=space)
 
     fig = plt.figure(figsize=(10, 10))  
     ax = fig.add_subplot(111, projection='3d')
     graph.plt_path_points(ax)
     graph.plot_nodes(ax)
     plt.savefig(f"graph_{graph.id}.png")
-    # plt.show()
+    plt.show()
 
 if __name__ == "__main__":
     # test_graph() # Uncomment to run the graph test
     # test_ant()  # Uncomment to run the ant test
-    test_ants(5)  # Uncomment to run the ants test
+    test_ants(50)  # Uncomment to run the ants test

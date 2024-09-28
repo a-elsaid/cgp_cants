@@ -48,20 +48,10 @@ class Ant():
 
     def pick_point(self, points):
         # Check if any of the output points are within the sense radius
-        
-        
-        nearby_output_points = [
-                    o_point 
-                            for o_point in self.space.output_points.values() 
-                            if o_point.distance_to(
-                                                    self.x, 
-                                                    self.y, 
-                                                    self.z, 
-                                                    self.f,
-                                                ) <= self.sense_radius
-                            ]
-        
-
+        nearby_output_points = []
+        for o_point in self.space.output_points:
+            if o_point.distance_to(self.x, self.y, self.z, self.f) <= self.sense_radius:
+                nearby_output_points.append(o_point)
 
         if np.random.uniform() < self.expore_rate:
             # Explore: pick a random point within the sense radius
@@ -92,9 +82,9 @@ class Ant():
             
     def in_out_pick_point(self, type):
         if type == 1:
-            points = self.space.input_points.values()
+            points = self.space.input_points
         elif type == 2:
-            points = self.space.output_points.values()
+            points = self.space.output_points
         if np.random.uniform() < self.expore_rate:
             # Explore: pick a random point within the sense radius
             point = np.random.choice(list(points), size=1)[0]

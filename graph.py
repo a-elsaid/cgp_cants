@@ -16,8 +16,10 @@ class Graph:
                     eps=0.15,
                     min_samples=2,
                     lags=5,
+                    space=None,
     ):
         self.id = Graph.count 
+        self.space = space
         Graph.count += 1
         self.eps = eps
         self.min_samples = min_samples
@@ -30,6 +32,14 @@ class Graph:
         # Create nodes
         self.create_nodes()
 
+        # Clean the graph
+        self.clean_graph()
+
+        # Fix lags
+        self.add_lagged_inputs()
+
+        # Visualize the graph
+        self.visualize_graph()
 
 
     def create_nodes(self, ):
@@ -45,6 +55,7 @@ class Graph:
                                                     )  
                 nodes_of_input_points[curr_point.get_id()] = curr_node
             
+            logger.debug(f"Node({curr_node.id}) - Point({curr_point.get_id()}) - Lag({curr_node.lag}) - Point_Z({curr_point.get_z()}), Node_Z({curr_node.z})")
             
             if next_point.get_node_type() == 2:
                 # Check if the node already exists
@@ -123,7 +134,8 @@ class Graph:
                                                             if node.point.get_node_type() == 0
                                                         ]
                                                        )
-            new_cluster_point = Point(*center_of_mass_point)        # TODO: add to search space
+            new_cluster_point = Point(*center_of_mass_point)
+            self.space.points.append(new_cluster_point)
             new_cluster_node = Node(point=new_cluster_point)
             logger.debug(f"\tNew cluster point: {new_cluster_point.get_id()} - Node: {new_cluster_node.id}")
             new_nodes.append(new_cluster_node)
@@ -224,7 +236,6 @@ class Graph:
         inreachable_from_out = [node.id for node in self.nodes.values() if node not in reachable_from_out]
         inreachable = set(inreachable_from_in + inreachable_from_out)
         
-        print(f"Non Reachable nodes: {[node_id for node_id in inreachable]}")
         for node_id in inreachable:
             logger.debug(f"Removing node {node_id} as it is not reachable from input nodes")
             self.remove_node(node_id)
@@ -236,11 +247,57 @@ class Graph:
         self.remove_dead_ends()         # Remove dead ends
         self.detect_and_remove_cycles() # Detect and remove cycles
 
+
+    def add_lagged_inputs(self,):
+        added_points = []
+        added_nodes = []
+        visited = set()
+
+        def thrust_forward(node, prev_node):
+            if node in visited:
+                return
+            visited.add(node)
+            if node.z<prev_node.z:
+                if node.z<=in_node.z:
+                    new_input_lag_point = Point(
+                                                    x = in_node.point.get_x(), 
+                                                    y = 0, 
+                                                    z = node.z, 
+                                                    f = in_node.point.get_f(), 
+                                                    type=1,
+                                                )
+                    new_input_lag_node = Node(point=new_input_lag_point, type=1)
+                    new_input_lag_node.add_edge(node)
+                    self.space.input_points.append(new_input_lag_point)
+                    added_points.append(new_input_lag_point)
+                    added_nodes.append(new_input_lag_node)
+                else:
+                    print(f"\tNode {node.id}({node.point.get_id()}) is above input node {in_node.id}({in_node.point.get_id()})")
+                    in_node.add_edge(node)
+                    
+
+            edges = list(node.outbound_edges.values())
+            for edge in edges:
+                thrust_forward(edge.target, node)
+
+        
+        #iterate over input nodes to start there and reach output nodes
+        for in_node in self.in_nodes:
+            edges = list(in_node.outbound_edges.values())
+            for edge in edges:
+                thrust_forward(edge.target, in_node)
+
+        for point in added_points:
+            self.ants_paths.append([point])
+        for node in added_nodes:
+            self.nodes[node.id] = node
+            self.in_nodes.append(node)
+
     
     """ 
     ************************************ Visualization *************************************** 
     """
-    def visualize_graph(self, filename='graph'):
+    def visualize_graph(self, filename=None,):
         import graphviz as gv
         dot = gv.Digraph(comment='Graph Visualization')
         
@@ -263,9 +320,11 @@ class Graph:
                 dot.edge(str(node.id), str(edge.target.id), style='solid', color='green')
 
             for edge in node.inbound_edges.values():
-                dot.edge(str(edge.source.id), str(node.id), style='dotted', color='red')
+                dot.edge(str(node.id), str(edge.source.id), style='dotted', color='red', arrowhead='none')
         
         # Render and save the graph
+        if filename is None:
+            filename = f"graph_{self.id}.gv"
         dot.render(filename, view=True)
 
 
@@ -303,8 +362,8 @@ class Graph:
             ax = fig.add_subplot(111, projection='3d')
             save_here = True
         for node in self.nodes.values():
-            ax.scatter(node.point.get_x(), node.point.get_y(), node.point.get_z(), color='red', marker='*', s=size)
-            ax.text(node.point.get_x(), node.point.get_y(), node.point.get_z(), f"{node.id}({node.point.get_id()})", color='red', fontsize=10)
+            ax.scatter(node.point.get_x(), node.point.get_y(), node.z, color='red', marker='*', s=size)
+            ax.text(node.point.get_x(), node.point.get_y(), node.z, f"{node.id}({node.point.get_id()})", color='red', fontsize=10)
         if save_here:
             plt.savefig(f"graph_{self.get_id()}_nodes.png")
             if show:

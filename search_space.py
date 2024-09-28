@@ -82,29 +82,33 @@ class Space():
         self.input_names = input_names
         self.output_names = output_names
         self.functions = functions
-        self.input_points = {}
-        self.output_points = {}
+        self.input_points = []
+        self.output_points = []
         self.points = []
         self.lag_levels = lags # Number of lag levels
         self.evaporation_rate = evap_rate
 
         for idx, input_name in enumerate(self.input_names):
-            self.input_points[input_name] = Point(
-                                                    x = idx / (len(input_names) - 1), 
-                                                    y = 0.0,              # y=0 and x between 0-1 and z=0.5
-                                                    z = 0.5,
-                                                    f = 0.0,
-                                                    type = 1,
-                                                )    
+            self.input_points.append( 
+                                        Point(
+                                            x = idx / (len(input_names) - 1), 
+                                            y = 0.0,              # y=0 and x between 0-1 and z=0.5
+                                            z = 0.5,
+                                            f = 0.0,
+                                            type = 1,
+                                        
+            ))    
 
         for idx, output_name in enumerate(self.output_names):
-            self.output_points[output_name] = Point(
-                                                        x = idx / (len(input_names) - 1), 
-                                                        y = 1,          # y=0 and x between 0-1 and z=0
-                                                        z = 1,
-                                                        f = 0.0,
-                                                        type = 2,
-                                                    )    
+            self.output_points.append(  Point(
+                                                x = idx / (len(input_names) - 1), 
+                                                y = 1,          # y=0 and x between 0-1 and z=0
+                                                z = 1,
+                                                f = 0.0,
+                                                type = 2,
+                                        )
+            )
+
 
         def evaporate(self, rate):
             for point in self.points:
@@ -112,21 +116,21 @@ class Space():
                 if point.get_pheromone()< 0.01:
                     self.points.remove(point)
             
-            for point in self.input_points.values():
+            for point in self.input_points:
                 pheromone = point.get_pheromone() * self.evaporation_rate
                 if pheromone < 0.1:
                     point.set_pheromone(0.1)
                 else:
                     point.set_pheromone(pheromone)
                 
-            for point in self.output_points.values():
+            for point in self.output_points:
                 pheromone = point.get_pheromone() * self.evaporation_rate
                 if pheromone < 0.1:
                     point.set_pheromone(0.1)
                 else:
                     point.set_pheromone(pheromone)
                 
-            for point in self.output_points.values():
+            for point in self.output_points:
                 pheromone = point.get_pheromone() * self.evaporation_rate
                 if pheromone < 0.1:
                     point.set_pheromone(0.1)
