@@ -81,7 +81,7 @@ class Space():
                     input_names: list, 
                     output_names: list,
                     evap_rate=0.1,
-                    lags=5,
+                    lags=4,
     ):
         self.output_names = output_names
         self.input_names = input_names
@@ -110,7 +110,7 @@ class Space():
         self.input_points.extend(input_points)
 
     def evaporate_pheromone(self, evaporation_rate):
-        logger.info(f"Evaporating pheromone with rate: {evaporation_rate}")
+        logger.trace(f"Evaporating pheromone with rate: {evaporation_rate}")
         for point in self.points:
             point.set_pheromone(point.get_pheromone() * evaporation_rate)
 

@@ -13,16 +13,16 @@ logger = loguru.logger
 
 class Edge():
     count = 0
-    def __init__(self, source, target, weight=0.0):
+    def __init__(self, source, target, weight=1.0):
         self.id = Edge.count + 1
         Edge.count += 1
         self.source = source
         self.target = target
         self.grad = 0.0
-        if weight !=1.0:
+        if weight is None:
             self.weight = np.random.uniform(-0.5, 0.5)
         else:
-            self.weight = 1.0
+            self.weight = weight
 
 
 class Node():
@@ -31,7 +31,7 @@ class Node():
                     self, 
                     type=0, 
                     point: Point = None, 
-                    lags=5,
+                    lags=None,
     ):
         self.id = Node.count + 1
         Node.count += 1
@@ -51,7 +51,7 @@ class Node():
         self.outbound_edges = {}
         self.active = False
         self.pick_node_functions(function_dict)
-        self.adjust_lag(lags=lags)    # Adjust lag levels based on the z value of the point
+        self.adjust_lag(lags=lags-1)    # Adjust lag levels based on the z value of the point
 
     def get_cluseter(self):
         return self.__cluster
@@ -77,6 +77,8 @@ class Node():
         if int(func_id) == func_id:
             func_id = int(func_id)
             self.functions.update({func_id: function_dict[func_id]})
+        elif int(func_id) == 0:
+            self.functions.update({0: function_dict[0]})
         else:
             prev_func_id = int(func_id - 1)
             next_func_id = int(func_id + 1)
@@ -100,9 +102,13 @@ class Node():
     def fire (self, ):
         results = []
         for func in self.functions.values():
-            results.append(np.clip(func(self.forefire), -5, 5))
-        self.node_value = np.sum(self.forefire)
-        self.node_value = sigmoid(np.sum(results))
+            fn_res = np.clip(func(self.forefire), -5, 5)
+            results.append(sigmoid(fn_res))
+
+        result = np.average(results)
+        result = np.clip(result, -5, 5)
+        self.node_value = sigmoid(result)
+        # self.node_value = np.sum(self.forefire)
         # self.node_value = sigmoid(np.sum(self.forefire))
         logger.debug(f"Node({self.id:5d}) is firing {self.node_value:.5f} [Signal({self.recieved_fire}/{len(self.inbound_edges)})]")
         for edge in self.outbound_edges.values():
@@ -117,17 +123,17 @@ class Node():
         if self.recieved_fire >= len(self.inbound_edges):
             self.fire()
 
-    def update_weights(self, lr=0.1, m=1):
+    def update_weights(self, lr=0.001, m=1):
         for edge in self.inbound_edges.values():
-            edge.source.update_weights(edge.weight, lr=lr)
-            edge.weight += lr * np.average(edge.grad/m)
+            # edge.source.update_weights(edge.weight, lr=lr)
+            edge.weight += lr * edge.grad
             edge.grad = 0.0
             
     def fireback (self,):
         for edge in self.inbound_edges.values():
             edge.source.recieve_backfire(self.backfire * self.node_value*(1-self.node_value) * edge.weight)
             edge.grad+= self.backfire * edge.source.node_value * self.node_value * (1 - self.node_value)
-            edge.grad = np.clip(edge.grad, -1, 1)
+            edge.grad = np.clip(edge.grad, -0.5, 0.5)
         self.recieved_backfire = 0
         self.backfire = 0.0
 

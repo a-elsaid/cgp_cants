@@ -17,7 +17,7 @@ class Graph:
     count = 1
     def __init__(   self, 
                     ants_paths,
-                    eps=0.15,
+                    eps=0.25,
                     min_samples=2,
                     lags=5,
                     space=None,
@@ -152,7 +152,7 @@ class Graph:
             new_cluster_point = Point(*center_of_mass_point, type=0)
             # self.space.points.append(new_cluster_point)   # Adding new points in the colony to decouple the graph from the colony
             self.added_points.append(new_cluster_point)
-            new_cluster_node = Node(point=new_cluster_point)
+            new_cluster_node = Node(point=new_cluster_point, lags=self.lags)
             logger.debug(f"\tNew cluster Point({new_cluster_point.get_id()}) - Node({new_cluster_node.id})")
             new_nodes.append(new_cluster_node)
 
@@ -310,7 +310,7 @@ class Graph:
                     new_input_lag_point.name = self.space.input_names[input_index]
                     new_input_lag_point.name_idx = input_index
                     logger.trace(f"LAG NODE: Adding node: Node({new_input_lag_point.get_id()})")
-                    new_input_lag_node = Node(point=new_input_lag_point, type=1)
+                    new_input_lag_node = Node(point=new_input_lag_point, type=1, lags=self.lags)
                     new_input_lag_node.add_edge(node)
                     # self.space.input_points.append(new_input_lag_point)   #adding new points in colony to decouple the graph from the colony
                     self.added_in_points.append(new_input_lag_point)
@@ -341,31 +341,35 @@ class Graph:
             self.in_nodes.append(node)
     
     def mse(self, y_true, y_pred):
-        mse = (np.array(y_true) - np.array(y_pred))**2 #/ len(y_true)
-        d_mse = np.array(y_pred) - np.array(y_true)
+        mse = np.array(y_true) - np.array(y_pred)
+        d_mse = mse
+        mse = mse**2
+        mse = mse/2
         logger.trace(f"Mean Squared Error: {mse} -- Derivative: {d_mse}")
         return mse, d_mse
 
 
-    def evaluate(self, train_input, train_target, cal_gradient=False):
-        results = []
+    def evaluate(self, train_input, train_target, cal_gradient=True):
+        preds = []
         # train_input = train_input[:self.future_steps]                 # TODO: Remove the future prediction steps
         # train_target = train_target[self.lags:self.future_steps]      # TODO: Remove the first lags values AND future prediction steps
         train_target = train_target[self.lags:]                         # Remove the first lags values
-        errors = []
-        d_errors = []
-        for i in range(0, len(train_input) - self.lags):
-            input = train_input[i:i+self.lags]
-            target = train_target[i]
-            self.feed_forward(input)
-            results.append(self.get_output())
-            err, d_err = self.mse(target, results[-1])
-            errors.append(err)
-            d_errors.append(d_err)
-            for node, err in zip(self.out_nodes, d_err):
-                node.d_err = err
-            if cal_gradient:
-                self.feed_backward()
+        for epoch in range(10):
+            logger.info(f"\tEpoch: {epoch}")
+            errors = []
+            d_errors = []
+            for i in range(0, len(train_input) - self.lags):
+                input = train_input[i:i+self.lags]
+                target = train_target[i]
+                self.feed_forward(input)
+                preds.append(self.get_output())
+                err, d_err = self.mse(target, preds[-1])
+                errors.append(err)
+                d_errors.append(d_err)
+                for node, err in zip(self.out_nodes, d_err):
+                    node.d_err = err
+                if cal_gradient:
+                    self.feed_backward()
 
         errors = np.array(errors)
         d_errors = np.array(d_errors) 
@@ -373,13 +377,14 @@ class Graph:
         return errors, d_errors
 
     def feed_forward(self, in_data):
-        lag_0 = self.lags - 1
         for i, node in enumerate(self.in_nodes):
-            node.recieve_fire(in_data[lag_0][node.point.name_idx])
+            node.recieve_fire(in_data[node.lag][node.point.name_idx])
 
     def feed_backward(self,):
         for node in self.out_nodes:
             node.recieve_backfire(node.d_err)
+        for node in self.nodes.values():
+            node.update_weights()
 
     def get_output(self):
         return [node.node_value for node in self.out_nodes]

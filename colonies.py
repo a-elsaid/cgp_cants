@@ -40,7 +40,7 @@ def create_colony():
         data_dir=args.data_dir,
     )
 
-    num_ants = np.random.randint(low=5, high=50)
+    num_ants = np.random.randint(low=5, high=20)
     population_size = np.random.randint(low=10, high=100)
     evaporation_rate = np.random.uniform(low=0.7, high=0.9)
     colony = Colony(
@@ -71,35 +71,34 @@ def living_colony():
     logger_setup()
     logger.info(f"Starting Colony: Lead Worker({rank}) reporting for duty")
     colony = create_colony()
-    col_id, workers, best_position_global, fitness_global = comm_mpi.recv(source=0)
-    colony.id = col_id+1
+    worker, best_position_global, fitness_global = comm_mpi.recv(source=0)
+    colony.id = worker
     logger.info(f"Worker {rank} Received Main's Kickoff Msg")
 
 
     for tim in range(intervals, args.living_time + 1, intervals):
-        colony.life()
-        if rank==workers[0]:
-            (   colony_fit, 
-                colony_position
-            ) = colony.get_col_fit(rank=rank, avg=False)
+        colony.life(num_itrs=intervals, total_itrs=args.living_time)
+        (   colony_fit, 
+            colony_position
+        ) = colony.get_col_fit(rank=rank, avg=False)
 
-            logger.info( f"Lead Worker({rank}) reporting " +
-                         f"its OverallFitness: {fitness_global} " +
-                         f"for Colony {colony.id} " +
-                         f"No. Ants ({colony.num_ants}) " +
-                         f"ER ({colony.evaporation_rate}) " +
-                         f"MR ({colony.mortality_rate})  " +
-                         f"({tim}/{intervals})"
-                       )
-            comm_mpi.send((tim, colony_position, colony_fit), dest=0)
-            best_position_global, fitness_global = comm_mpi.recv(source=0)
-            colony.update_velocity(best_position_global)
-            colony.update_position()
-            print(f"=====+++++>>> Colony({colony.id}) Best Global Pos: {best_position_global})  Best Col Pos: {colony.pso_best_position} No Ants: {colony.num_ants} ER: {colony.evaporation_rate}  MR: {colony.mortality_rate}")
+        logger.info( 
+                        f"Worker({rank}) reporting " +
+                        f"its OverallFitness: {fitness_global} " +
+                        f"for Colony {colony.id} " +
+                        f"No. Ants ({colony.num_ants}) " +
+                        f"ER ({colony.evaporation_rate}) " +
+                        f"MR ({colony.mortality_rate})  " +
+                        f"({tim}/{args.living_time})"
+                    )
+        comm_mpi.send((tim, colony_position, colony_fit), dest=0)
+        best_position_global, fitness_global = comm_mpi.recv(source=0)
+        colony.update_velocity(best_position_global)
+        colony.update_position()
+        logger.info(f"***---===>>> Colony({colony.id}) Best Global Pos: {best_position_global})  Best Col Pos: {colony.pso_best_position} No Ants: {colony.num_ants} ER: {colony.evaporation_rate}  MR: {colony.mortality_rate}")
 
-    if rank==workers[0]:
-        comm_mpi.send(None, dest=0)
-        comm_mpi.send(colony, dest=0)
+    comm_mpi.send(None, dest=0)
+    comm_mpi.send(colony, dest=0)
 
 ''' 
     First CPU: Environment
@@ -107,7 +106,8 @@ def living_colony():
     First CPU in a group is Manager of group (Colony)
     Other group-CPUs: Workers
 '''
-worker_group = np.arange(1,comm_size).reshape(args.num_colonies,-1)
+worker_group = np.arange(1,comm_size)
+num_colonies = comm_size - 1
 
 def environment():
     logger_setup()
@@ -116,24 +116,24 @@ def environment():
     BEST_POS_GOL = [0] * args.num_colonies
     FIT_GOL = np.zeros(args.num_colonies)
     logger.info(f"Main reporting for duty")
-    for c in range(args.num_colonies):
-        for w in worker_group[c]:
-            logger.info(f"Main sending Worker {w} its' kickoff msg") 
-            comm_mpi.send((c, worker_group[c], best_position_global, fitness_global), dest=w)
-            logger.info(f"Main finished sending Worker {w} its' kickoff msg") 
+
+    for w in worker_group:
+        logger.info(f"Main sending Worker {w} its' kickoff msg") 
+        comm_mpi.send((w, best_position_global, fitness_global), dest=w)
+        logger.info(f"Main finished sending Worker {w} its' kickoff msg") 
 
     done_workers = 0
     best_colonies = []
     while True:
-        for c in range(args.num_colonies):
-            msg = comm_mpi.recv(source=worker_group[c][0])
+        for c in range(1, args.num_colonies+1):
+            msg = comm_mpi.recv(source=c)
             if msg:
                 tim, best_position, fitness_global = msg
-                BEST_POS_GOL[c] = best_position
-                FIT_GOL[c] = fitness_global
+                BEST_POS_GOL[c-1] = best_position
+                FIT_GOL[c-1] = fitness_global
             else:
                 done_workers+=1
-                best_colonies.append(comm_mpi.recv(source=worker_group[c][0]))
+                best_colonies.append(comm_mpi.recv(source=c))
         if done_workers==args.num_colonies:
             break
         elif 0<done_workers<args.num_colonies:
@@ -142,8 +142,8 @@ def environment():
         fitness_global = np.min(FIT_GOL)
         best_position_global = BEST_POS_GOL[np.argmin(FIT_GOL)]
         logger.info(f"*** Finished {tim}/{args.living_time} Living Time ** Best Global Fitness: {fitness_global} ***")
-        for c in range(args.num_colonies):
-            comm_mpi.send((best_position_global, fitness_global), dest=worker_group[c][0])
+        for c in range(1,args.num_colonies+1):
+            comm_mpi.send((best_position_global, fitness_global), dest=c)
         
     '''
         **** TODO ****

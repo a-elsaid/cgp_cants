@@ -3,5 +3,8 @@
 *.png
 *.pdf
 *.gv
+colony_*
+LOG*
+OUT*
 graph_*
 __pycache__

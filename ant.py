@@ -13,8 +13,8 @@ class Ant():
         self.y = 0
         self.z = 0
         self.f = 0
-        self.sense_range = np.random.uniform(0.1, 0.50)
-        self.explore_rate = np.random.uniform(0.15, 1)
+        self.sense_range = np.random.uniform(0.80, 0.90)
+        self.explore_rate = np.random.uniform(0.2, 1.0)
         self.original_explore_rate = self.explore_rate
         self.mutation_sigma = 0.15
         self.space = space
@@ -246,7 +246,7 @@ class Ant():
                 self.sense_range,
             ) = (
                 np.random.uniform(low=0.1, high=0.9),
-                np.random.uniform(low=0.1, high=0.5),
+                np.random.uniform(low=0.1, high=0.9),
             )
 
         def cross_over(behavior1: np.ndarray, behavior2: np.ndarray):

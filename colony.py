@@ -37,10 +37,12 @@ class Colony():
         self.best_score = None
         self.avg_col_score = None
         self.bst_col_score = None
+        self.boost_exploration = True
         self.mortality_rate = np.random.uniform(0.1, 0.5)
         self.evaporation_rate = np.random.uniform(0.1, 0.5)
         self.original_evaporation_rate = self.evaporation_rate  # Store the original evaporation rate
         self.population_size = population_size
+        self.life_count = 0
         self.space = Space(
                             input_names=input_names, 
                             output_names=output_names, 
@@ -51,7 +53,7 @@ class Colony():
         self.pso_position = [self.num_ants, self.mortality_rate, self.evaporation_rate]
         self.pso_velocity = np.random.uniform(low=-1, high=1, size=len(self.pso_position))
         self.pso_best_position = self.pso_position
-        self.pso_bounds = [[10, 300], [0.01, 0.1], [0.15, 0.95]]
+        self.pso_bounds = [[5, 20], [0.01, 0.1], [0.15, 0.95]] # Number of ants, mortality rate, evaporation rate
 
     def set_evaporation_rate(self, rate):
         self.evaporation_rate = rate
@@ -128,22 +130,24 @@ class Colony():
             ant.update_best_behaviors(fit)
             ant.evolve_behavior()
 
-    def life(self,):
-        boost_exploration = True
-        space_is_not_explored = False
+    def life(self, num_itrs=None, total_itrs=None):
+        if num_itrs:
+            self.num_itrs = num_itrs
         for itr in range(self.num_itrs):
-            logger.info(f"Colony({self.id}): Iteration: {itr}")
-            if boost_exploration:
+            logger.info(f"Colony({self.id}): Iteration: {self.life_count}{f'/{total_itrs}' if total_itrs else ''}")
+            self.life_count+=1
+            if self.boost_exploration:
                 space_is_not_explored = self.check_explored_space()
                 if space_is_not_explored:
                     logger.info(f"Colony({self.id}): Space is not fully explored: Boosting Exploration")
                     self.evaporation_rate = 0.999
                 else:
                     logger.info(f"Colony({self.id}): Space is fully explored: Resetting Exploration")
-                    boost_exploration = False
+                    self.boost_exploration = False
                     self.evaporation_rate = self.original_evaporation_rate
-            graph = self.ants_go(increase_exploration=space_is_not_explored)
+            graph = self.ants_go(increase_exploration=self.boost_exploration)
             
+
             fig = plt.figure(figsize=(40, 40))
             ax = fig.add_subplot(111, projection='3d')
             
@@ -155,6 +159,8 @@ class Colony():
             plt.clf()
             plt.close()
             graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}")  
+            '''
+            '''
             
 
             fit, _ = graph.evaluate(self.train_input, self.train_target)

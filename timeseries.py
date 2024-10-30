@@ -57,8 +57,8 @@ class Timeseries:
                 input_data, output_data = self.load_data(
                     "/".join([self.data_dir, name]), self.input_names, self.output_names
                 )
-                self.input_data = self.input_data.append(input_data)
-                self.output_data = self.output_data.append(output_data)
+                self.input_data = pd.concat((self.input_data, input_data))
+                self.output_data = pd.concat((self.output_data, output_data))
         # return self.input_data, self.output_data
 
     def load_data(self, file_name, in_params, out_params) -> None:
