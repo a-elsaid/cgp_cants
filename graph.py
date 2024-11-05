@@ -432,6 +432,9 @@ class Graph:
             fig = plt.figure(figsize=(size, size))
             ax = fig.add_subplot(111, projection='3d')
             save_here = True
+            clear_here = True
+        else:
+            clear_here = False
         for i,points in enumerate(self.ants_paths):
             xs = [p.get_x() for p in points]
             ys = [p.get_y() for p in points]
@@ -451,6 +454,10 @@ class Graph:
             plt.savefig(f"graph_{self.id}_paths.png")
             if show:
                 plt.show()
+        if clear_here:
+            plt.cla()
+            plt.clf()
+            plt.close('all')
 
 
     def plot_nodes(self, ax=None, size=40, save_here=False, show=False, plt=None):
