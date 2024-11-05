@@ -101,8 +101,55 @@ def multiply(x):
     return np.prod(x)
 def tanh(x):
     return np.tanh(np.sum(x))
+def inverse(x):
+    return np.sum([1/max(j, 0.0001) for j in x])
+def negate(x):
+    return np.sum(np.array(x) * -1)
 
+def maximum(x):
+    return np.max(x)
+def minimum(x):
+    return np.min(x)
+def logic_add(x):
+    return np.sum(np.array(x) > 0)
+def logic_or(x):
+    return np.sum(np.array(x) > 0) > 0
+def exp(x):
+    return np.sum(np.exp(x))
+def log(x, base=np.e):
+    x = np.clip(x, 1e-10, None)
+    if base == np.e:
+        log_values = np.sum(np.log(x))  # Natural log
+    else:
+        log_values = np.sum(np.log(x) / np.log(base))  # Log with custom base
+    
+    return log_values
+def sqrt(x):
+    signs = np.sign(x)
+    return np.sum(signs*np.sqrt(np.abs(x)))
+def square(x):
+    return np.sum(np.square(np.abs(x)))
+def cube(x):
+    return np.sum(np.power(x, 3))
+def softmax(x):
+    return np.sum(np.exp(x)) / np.sum(np.exp(x))
+def cosh(x):
+    return np.sum(np.cosh(x))
+def sinh(x):
+    return np.sum(np.sinh(x))
 
+def xor(x):
+    # XOR over multiple inputs is true if an odd number of inputs are true
+    return np.sum(x) % 2  # Returns 1 if the count of 1s is odd, 0 if even
+def xnor(x):
+    # XNOR is the complement of XOR, true if an even number of inputs are true
+    return 1 - xor(x)  # Returns 1 if XOR result is 0, 0 if XOR result is 1
+def ispositive(x):
+    return np.sum(np.array(x) > 0)
+def isnegative(x):
+    return np.sum(np.array(x) < 0)
+def iszero(x):
+    return np.sum(np.array(x) < 0.05)
 
 
 function_dict = {
@@ -115,6 +162,25 @@ function_dict = {
                     6: relu,
                     7: leaky_relu,
                     8: tanh,
+                    9: inverse,
+                    10: negate,
+                    11: maximum,
+                    12: minimum,
+                    13: logic_add,
+                    14: logic_or,
+                    15: exp,
+                    16: log,
+                    17: sqrt,
+                    18: square,
+                    19: cube,
+                    20: softmax,
+                    21: cosh,
+                    22: sinh,
+                    23: xor,
+                    24: xnor,
+                    25: ispositive,
+                    26: isnegative,
+                    27: iszero,
                 }
 function_names = {
                     0: 'add', 
@@ -126,4 +192,23 @@ function_names = {
                     6: 'relu',
                     7: 'leaky_relu',
                     8: 'tanh',
+                    9: 'inverse',
+                    10: 'negate',
+                    11: 'maximum',
+                    12: 'minimum',
+                    13: 'logic_add',
+                    14: 'logic_or',
+                    15: 'exp',
+                    16: 'log',
+                    17: 'sqrt',
+                    18: 'square',
+                    19: 'cube',
+                    20: 'softmax',
+                    21: 'cosh',
+                    22: 'sinh',
+                    23: 'xor',
+                    24: 'xnor',
+                    25: 'ispositive',
+                    26: 'isnegative',
+                    27: 'iszero',
                 }

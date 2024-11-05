@@ -148,9 +148,9 @@ class Colony():
             graph = self.ants_go(increase_exploration=self.boost_exploration)
             
 
+            '''
             fig = plt.figure(figsize=(40, 40))
             ax = fig.add_subplot(111, projection='3d')
-            
             graph.plot_path_points(ax=ax, plt=plt)
             graph.plot_nodes(ax=ax, plt=plt)
             graph.plot_pheromones(ax=ax, plt=plt)
@@ -159,7 +159,6 @@ class Colony():
             plt.clf()
             plt.close()
             graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}")  
-            '''
             '''
             
 

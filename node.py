@@ -1,7 +1,7 @@
 import numpy as np
 from search_space import Point
 from math import ceil, floor
-from util import function_dict
+from util import function_dict, function_names
 import loguru
 
 def sigmoid(x):
@@ -101,13 +101,18 @@ class Node():
 
     def fire (self, ):
         results = []
-        for func in self.functions.values():
-            fn_res = np.clip(func(self.forefire), -5, 5)
-            results.append(sigmoid(fn_res))
+        # if self.type==1: print("--------------------")
+        # print(f"value: {self.forefire}")
+        for fn_id, func in self.functions.items():
+            fn_res = func(self.forefire)
+            fn_res = np.clip(fn_res, -2.8, 2.8)
+            # results.append(fn_res)
+            results.append(np.tanh(fn_res))
+            # if self.id==1: print(f"--->>Node({self.id}) Type({self.type}) Function({function_names[fn_id]}) result: {fn_res}")
 
         result = np.average(results)
-        result = np.clip(result, -5, 5)
-        self.node_value = sigmoid(result)
+        result = np.clip(result, -2.8, 2.8)
+        self.node_value = np.tanh(result)
         # self.node_value = np.sum(self.forefire)
         # self.node_value = sigmoid(np.sum(self.forefire))
         logger.debug(f"Node({self.id:5d}) is firing {self.node_value:.5f} [Signal({self.recieved_fire}/{len(self.inbound_edges)})]")

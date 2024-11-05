@@ -349,13 +349,14 @@ class Graph:
         return mse, d_mse
 
 
-    def evaluate(self, train_input, train_target, cal_gradient=True):
+    def evaluate(self, train_input, train_target, cal_gradient=False):
         preds = []
         # train_input = train_input[:self.future_steps]                 # TODO: Remove the future prediction steps
         # train_target = train_target[self.lags:self.future_steps]      # TODO: Remove the first lags values AND future prediction steps
         train_target = train_target[self.lags:]                         # Remove the first lags values
-        for epoch in range(10):
-            logger.info(f"\tEpoch: {epoch}")
+        num_epochs = 1
+        for epoch in range(num_epochs):
+            if num_epochs>1: logger.info(f"\tEpoch: {epoch}")
             errors = []
             d_errors = []
             for i in range(0, len(train_input) - self.lags):
@@ -370,6 +371,8 @@ class Graph:
                     node.d_err = err
                 if cal_gradient:
                     self.feed_backward()
+                # print(f"I:{i}: Input: {input}")
+            # exit(1)
 
         errors = np.array(errors)
         d_errors = np.array(d_errors) 
