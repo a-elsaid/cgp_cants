@@ -23,17 +23,44 @@ class Timeseries:
         self.load_data_from_files(self.input_names, self.output_names)
         input_padding = np.zeros((time_lag, len(self.input_names)), dtype=np.float32)
         norm_fun = self.normalization(norm_type)
-        self.input_data = np.array(norm_fun(self.input_data))
+        
         if future_time != 0:
             self.input_data = self.input_data[:-future_time]
-        train_test_mark = int(len(self.input_data) * 0.8)
-        self.train_input = self.input_data[:train_test_mark]
-        self.test_input = self.input_data[train_test_mark:]
+        self.output_data = np.array(self.output_data)[future_time:]
+
+        (
+            self.train_input, 
+            self.test_input, 
+            self.train_output, 
+            self.test_output) = self.split_data(
+                                                self.input_data, 
+                                                self.output_data
+                            )
+        self.norm_fun = self.normalization(norm_type)
+        (
+            self.train_input, 
+            self.train_output, 
+            self.test_input, 
+            self.test_output
+        ) = self.norm_fun(
+                            self.train_input, 
+                            self.train_output, 
+                            self.test_input, 
+                            self.test_output,
+                            )
         self.train_input = np.append(input_padding, self.train_input, axis=0)
         self.test_input = np.append(input_padding, self.test_input, axis=0)
-        self.output_data = np.array(norm_fun(self.output_data))[future_time:]
-        self.train_output = self.output_data[:train_test_mark]
-        self.test_output = self.output_data[train_test_mark:]
+
+    def split_data(self, in_data, out_data, split_ratio: float = 0.8, norm_fun=None):
+        split_point = int(len(in_data) * split_ratio)
+        train_input = in_data[:split_point]
+        test_input = in_data[split_point:]
+        train_output = out_data[:split_point]
+        test_output = out_data[split_point:] 
+        return train_input, test_input, train_output, test_output
+        
+        
+        return data[:split_point], data[split_point:]
 
     def normalization(self, norm_type: str = "minmax"):
         normalization_types = {
@@ -76,11 +103,15 @@ class Timeseries:
     def mean_normalize(self, data):
         return (data - data.mean()) / data.std()
 
-    def min_max_normalize(self, data):
-        for x in data:
-            min_ = data[x].min()
-            max_ = data[x].max()
-            if min_ == max_:
-                min_ = 0.0
-            data[x] = (data[x] - min_) / (max_ - min_)
-        return data
+    def min_max_normalize(self, train_in, train_out, test_in, test_out):
+        max_train = np.max(train_in, axis=0)
+        min_train = np.min(train_in, axis=0)
+        train_in = (train_in - min_train) / (max_train - min_train)
+        test_in = (test_in - min_train) / (max_train - min_train)
+        max_train = np.max(train_out, axis=0)
+        min_train = np.min(train_out, axis=0)
+        train_out = (train_out - min_train) / (max_train - min_train)
+        test_out = (test_out - min_train) / (max_train - min_train)
+        
+        return train_in, train_out, test_in, test_out
+      

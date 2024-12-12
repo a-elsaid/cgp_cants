@@ -3,6 +3,7 @@ from search_space import Point
 from math import ceil, floor
 from util import function_dict, function_names
 import loguru
+import torch
 
 def sigmoid(x):
     # x = max(-100.0, min(100.0, x))
@@ -50,7 +51,10 @@ class Node():
         self.inbound_edges = {}
         self.outbound_edges = {}
         self.active = False
-        self.pick_node_functions(function_dict)
+        if self.type == 2:
+            self.functions = {28: function_dict[28]}
+        else:
+            self.pick_node_functions(function_dict)
         self.adjust_lag(lags=lags-1)    # Adjust lag levels based on the z value of the point
 
     def get_cluseter(self):
@@ -60,7 +64,15 @@ class Node():
         self.__cluster = cluster
 
     def add_functions(self, functions):
-        self.functions.update(functions)
+        if self.type == 2:
+            self.functions = {28: function_dict[28]}
+        else:
+            '''Add the functions to the node'''
+            # self.functions.update(functions)
+
+            '''Ramdomly pick a function and make it the only function for the node'''
+            random_key = np.random.choice(list(functions.keys()))
+            self.functions = {random_key: function_dict[random_key]}
 
         
     def compare_corr(self, node):
@@ -105,14 +117,20 @@ class Node():
         # print(f"value: {self.forefire}")
         for fn_id, func in self.functions.items():
             fn_res = func(self.forefire)
-            fn_res = np.clip(fn_res, -2.8, 2.8)
-            # results.append(fn_res)
-            results.append(np.tanh(fn_res))
+            fn_res = np.clip(fn_res, -3.1, 3.1)
+            results.append(fn_res)
+            # break
+            # results.append(np.tanh(fn_res))
             # if self.id==1: print(f"--->>Node({self.id}) Type({self.type}) Function({function_names[fn_id]}) result: {fn_res}")
+            # print(f"\t\tNode({self.id}) Type({self.type}) Function({function_names[fn_id]}) result: {fn_res}")
+        # if self.type==2:
+        #     print(f"forefire: {self.forefire}")
 
+        results = np.clip(results, -2.8, 2.8)
         result = np.average(results)
-        result = np.clip(result, -2.8, 2.8)
+        # result = np.clip(result, -2.8, 2.8)
         self.node_value = np.tanh(result)
+        # print(f"Node({self.id}) Type({self.type}) Average: {result} Final: {self.node_value}")
         # self.node_value = np.sum(self.forefire)
         # self.node_value = sigmoid(np.sum(self.forefire))
         logger.debug(f"Node({self.id:5d}) is firing {self.node_value:.5f} [Signal({self.recieved_fire}/{len(self.inbound_edges)})]")

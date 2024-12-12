@@ -21,9 +21,11 @@ class Graph:
                     min_samples=2,
                     lags=5,
                     space=None,
+                    colony_id=None,
     ):
         self.id = Graph.count 
         self.space = space
+        self.colony_id = colony_id
         Graph.count += 1
         self.eps = eps
         self.min_samples = min_samples
@@ -340,40 +342,44 @@ class Graph:
             self.nodes[node.id] = node
             self.in_nodes.append(node)
     
+
+
+
+
+
+
     def mse(self, y_true, y_pred):
         mse = np.array(y_true) - np.array(y_pred)
         d_mse = mse
-        mse = mse**2
+        mse = mse*mse
         mse = mse/2
         logger.trace(f"Mean Squared Error: {mse} -- Derivative: {d_mse}")
         return mse, d_mse
 
-
-    def evaluate(self, train_input, train_target, cal_gradient=False):
+    def evaluate(self, train_input, train_target, cal_gradient=True):
         preds = []
-        # train_input = train_input[:self.future_steps]                 # TODO: Remove the future prediction steps
-        # train_target = train_target[self.lags:self.future_steps]      # TODO: Remove the first lags values AND future prediction steps
-        train_target = train_target[self.lags:]                         # Remove the first lags values
-        num_epochs = 1
+        # train_target = train_target[:-self.lags]                         # Remove the first lags values
+        
+        num_epochs = 10
         for epoch in range(num_epochs):
-            if num_epochs>1: logger.info(f"\tEpoch: {epoch}")
+            if num_epochs>1: logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {epoch:3d}/{num_epochs}")
             errors = []
             d_errors = []
             for i in range(0, len(train_input) - self.lags):
-                input = train_input[i:i+self.lags]
-                target = train_target[i]
-                self.feed_forward(input)
+                input_data = train_input[i:i+self.lags]
+                target = train_target[i+self.lags]
+                self.feed_forward(input_data)
                 preds.append(self.get_output())
+
                 err, d_err = self.mse(target, preds[-1])
                 errors.append(err)
                 d_errors.append(d_err)
-                for node, err in zip(self.out_nodes, d_err):
-                    node.d_err = err
+                for node, e in zip(self.out_nodes, d_err):
+                    node.d_err = e
                 if cal_gradient:
                     self.feed_backward()
-                # print(f"I:{i}: Input: {input}")
-            # exit(1)
-
+                # print(f"Epoch: {epoch} - Iteration: {i} - Error: {err} - Prediction: {preds[-1]} - Target: {target}")
+            
         errors = np.array(errors)
         d_errors = np.array(d_errors) 
 
@@ -391,6 +397,14 @@ class Graph:
 
     def get_output(self):
         return [node.node_value for node in self.out_nodes]
+
+
+
+
+
+
+
+
 
     
     """ 

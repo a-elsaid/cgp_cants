@@ -40,7 +40,7 @@ def create_colony():
         data_dir=args.data_dir,
     )
 
-    num_ants = np.random.randint(low=5, high=20)
+    num_ants = np.random.randint(low=1, high=20)
     population_size = np.random.randint(low=10, high=100)
     evaporation_rate = np.random.uniform(low=0.7, high=0.9)
     colony = Colony(

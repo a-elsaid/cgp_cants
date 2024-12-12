@@ -77,34 +77,34 @@ def dbscan(points, epsilon, min_pts):
 
 # Functions
 def sin(x):
-    return np.sum(list(map(np.sin, x)))
+    return np.mean(list(map(np.sin, x)))
 def cos(x):
-    return np.sum(list(map(np.cos, x)))
+    return np.mean(list(map(np.cos, x)))
 def tan(x):
-    return np.sum(list(map(np.tan, x)))
+    return np.mean(list(map(np.tan, x)))
 def sigmoid(x):
     def sig_fun(x):
         x = np.float64(x)
         return 1 / (1 + np.exp(-x))
-    return np.sum(list(map(sig_fun, x)))
+    return np.mean(list(map(sig_fun, x)))
 def relu(x):
     def relu_fun(x):
         return max(0, x)
-    return relu_fun(np.sum(x))
+    return relu_fun(np.mean(x))
 def leaky_relu(x):
     def leaky_relu_fun(x):
         return max(0.01*x, x)
-    return leaky_relu_fun(np.sum(x))
+    return leaky_relu_fun(np.mean(x))
 def add(x):
     return np.sum(x)
 def multiply(x):
     return np.prod(x)
 def tanh(x):
-    return np.tanh(np.sum(x))
+    return np.tanh(np.mean(x))
 def inverse(x):
-    return np.sum([1/max(j, 0.0001) for j in x])
+    return np.mean([1/max(j, 0.0001) for j in x])
 def negate(x):
-    return np.sum(np.array(x) * -1)
+    return np.mean(np.array(x) * -1)
 
 def maximum(x):
     return np.max(x)
@@ -115,43 +115,44 @@ def logic_add(x):
 def logic_or(x):
     return np.sum(np.array(x) > 0) > 0
 def exp(x):
-    return np.sum(np.exp(x))
+    return np.mean(np.exp(x))
 def log(x, base=np.e):
     x = np.clip(x, 1e-10, None)
     if base == np.e:
-        log_values = np.sum(np.log(x))  # Natural log
+        return np.mean(np.log(x))  # Natural log
     else:
-        log_values = np.sum(np.log(x) / np.log(base))  # Log with custom base
+        return np.mean(np.log(x) / np.log(base))  # Log with custom base
     
-    return log_values
 def sqrt(x):
     signs = np.sign(x)
-    return np.sum(signs*np.sqrt(np.abs(x)))
+    return np.mean(signs*np.sqrt(np.abs(x)))
 def square(x):
-    return np.sum(np.square(np.abs(x)))
+    return np.mean(np.square(np.abs(x)))
 def cube(x):
-    return np.sum(np.power(x, 3))
+    return np.mean(np.power(x, 3))
 def softmax(x):
-    return np.sum(np.exp(x)) / np.sum(np.exp(x))
+    return np.argmax(np.exp(x)) / np.sum(np.exp(x))/len(x)
 def cosh(x):
-    return np.sum(np.cosh(x))
+    return np.mean(np.cosh(x))
 def sinh(x):
-    return np.sum(np.sinh(x))
+    return np.mean(np.sinh(x))
 
 def xor(x):
     # XOR over multiple inputs is true if an odd number of inputs are true
-    return np.sum(x) % 2  # Returns 1 if the count of 1s is odd, 0 if even
+    return np.mean(x) % 2  # Returns 1 if the count of 1s is odd, 0 if even
 def xnor(x):
     # XNOR is the complement of XOR, true if an even number of inputs are true
     return 1 - xor(x)  # Returns 1 if XOR result is 0, 0 if XOR result is 1
 def ispositive(x):
-    return np.sum(np.array(x) > 0)
+    return np.sum(np.array(x) > 0) > 0
 def isnegative(x):
-    return np.sum(np.array(x) < 0)
+    return np.sum(np.array(x) < 0) < 0
 def iszero(x):
-    return np.sum(np.array(x) < 0.05)
+    s = np.sum(x)
+    return s>-0.05 and s<0.05
 
-
+def mean(x):
+    return np.mean(x)
 function_dict = {
                     0: add, 
                     1: multiply, 
@@ -181,6 +182,7 @@ function_dict = {
                     25: ispositive,
                     26: isnegative,
                     27: iszero,
+                    28: mean,
                 }
 function_names = {
                     0: 'add', 
@@ -211,4 +213,5 @@ function_names = {
                     25: 'ispositive',
                     26: 'isnegative',
                     27: 'iszero',
+                    28: 'mean',
                 }

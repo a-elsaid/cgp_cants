@@ -24,6 +24,7 @@ class Colony():
                     test_input: np.ndarray = None,
                     test_target: np.ndarray = None,
                     num_itrs: int = 10,
+                    worker_id: int = None,
     ):
         self.id = Colony.count + 1
         Colony.count += 1
@@ -54,6 +55,7 @@ class Colony():
         self.pso_velocity = np.random.uniform(low=-1, high=1, size=len(self.pso_position))
         self.pso_best_position = self.pso_position
         self.pso_bounds = [[5, 20], [0.01, 0.1], [0.15, 0.95]] # Number of ants, mortality rate, evaporation rate
+        logger.info(f"Colony({self.id}) (Worker_{worker_id}):: Created with {num_ants} ants and {population_size} population size")
 
     def set_evaporation_rate(self, rate):
         self.evaporation_rate = rate
@@ -104,7 +106,7 @@ class Colony():
             paths.append(ant.path)
             self.space.add_new_points(ant.new_points)
             self.space.add_input_points(ant.new_in_points)
-        graph = Graph(ants_paths = paths, space=self.space)
+        graph = Graph(ants_paths = paths, space=self.space, colony_id=self.id)
         return graph
 
 
@@ -133,6 +135,7 @@ class Colony():
     def life(self, num_itrs=None, total_itrs=None):
         if num_itrs:
             self.num_itrs = num_itrs
+        patience = 10
         for itr in range(self.num_itrs):
             logger.info(f"Colony({self.id}): Iteration: {self.life_count}{f'/{total_itrs}' if total_itrs else ''}")
             self.life_count+=1
@@ -149,6 +152,7 @@ class Colony():
             
 
             '''
+            '''
             fig = plt.figure(figsize=(40, 40))
             ax = fig.add_subplot(111, projection='3d')
             graph.plot_path_points(ax=ax, plt=plt)
@@ -158,14 +162,14 @@ class Colony():
             plt.cla()
             plt.clf()
             plt.close()
-            graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}")  
-            '''
+            graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}.gz")  
             
 
             fit, _ = graph.evaluate(self.train_input, self.train_target)
             fit = np.mean(fit)
             logger.info(f"Colony({self.id}): Fitness: {fit}")
             inserted = self.insert_to_population(fit, graph)
+
             self.evolve_ants(fit)
             if inserted:
                 self.update_scores()
@@ -175,6 +179,18 @@ class Colony():
 
 
             self.space.evaporate_pheromone(self.evaporation_rate)
+
+            '''
+            Resting Colony's Evaporation Rate to Max
+            if no better graphs are found
+            '''
+            if (not self.boost_exploration) and (not inserted):
+                logger.info(f"Colony({self.id}): No Improvemnet->Resetting Evaporation Rate")
+                patience-=1
+            if patience == 0:
+                self.self.boost_exploration = True
+                patience = 10
+            prev_inserted = inserted
 
 
     def get_col_fit(self, rank=None, avg:bool=False) -> float:
