@@ -7,6 +7,7 @@ import loguru
 import graphviz as gv
 from time import time
 import sys
+import torch
 
 import ipdb
 
@@ -22,8 +23,10 @@ class Graph:
                     lags=5,
                     space=None,
                     colony_id=None,
+                    use_torch=True,
     ):
         self.id = Graph.count 
+        self.__use_torch = use_torch
         self.space = space
         self.colony_id = colony_id
         Graph.count += 1
@@ -348,55 +351,75 @@ class Graph:
 
 
 
-    def mse(self, y_true, y_pred):
-        mse = np.array(y_true) - np.array(y_pred)
-        d_mse = mse
-        mse = mse*mse
-        mse = mse/2
+    def mse(self, y_true, y_pred, prt=False):
+        # mse = np.array(y_true) - np.array(y_pred)
+        err = y_true - y_pred
+        if prt: print(f"Prediction: {y_pred.item():.7f}, GT: {y_true.item():.7f}, Err: {err.item():.7f}")
+        mse = (err*err)/2
+        d_mse = err
         logger.trace(f"Mean Squared Error: {mse} -- Derivative: {d_mse}")
         return mse, d_mse
 
-    def evaluate(self, train_input, train_target, cal_gradient=True):
-        preds = []
-        # train_target = train_target[:-self.lags]                         # Remove the first lags values
+    def evaluate(self, data, cal_gradient=True):
+        # target = target[:-self.lags]                         # Remove the first lags values
+        num_epochs = 15
+        input = torch.tensor(data.train_input, requires_grad=True, dtype=torch.float32)
+        target = torch.tensor(data.train_output, requires_grad=True, dtype=torch.float32)
         
-        num_epochs = 10
-        for epoch in range(num_epochs):
-            if num_epochs>1: logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {epoch:3d}/{num_epochs}")
-            errors = []
-            d_errors = []
-            for i in range(0, len(train_input) - self.lags):
-                input_data = train_input[i:i+self.lags]
-                target = train_target[i+self.lags]
-                self.feed_forward(input_data)
-                preds.append(self.get_output())
+        def thrust(input, target, prt=False):
+            preds, errors, d_errors = [], [], []
+            for i in range(0, len(input) - self.lags):
 
-                err, d_err = self.mse(target, preds[-1])
+                input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
+                self.feed_forward(input_data)
+                out = self.get_output()
+                preds.append(out)
+                err, d_err = self.mse(target_data, out, prt)
+                # if self.__use_torch:
+                    # err.retain_grad()
                 errors.append(err)
                 d_errors.append(d_err)
                 for node, e in zip(self.out_nodes, d_err):
                     node.d_err = e
                 if cal_gradient:
-                    self.feed_backward()
-                # print(f"Epoch: {epoch} - Iteration: {i} - Error: {err} - Prediction: {preds[-1]} - Target: {target}")
+                    self.feed_backward(err)
+            # self.feed_backward(torch.stack(errors))
+            return preds, errors, d_errors
             
-        errors = np.array(errors)
-        d_errors = np.array(d_errors) 
+        for epoch in range(1,num_epochs+1):
+            preds, errors, d_errors = thrust(input, target, prt=False)
+                    
+            train_errors = torch.stack(errors) if self.__use_torch else np.array(errors)
+            train_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
+            train_preds = torch.stack(preds) if self.__use_torch else np.array(preds)
+            if num_epochs>1: 
+                logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {(epoch):3d}/{num_epochs} Epoch MSE: {torch.mean(train_errors):.6e}")
+                if torch.mean(train_errors) > 10:
+                    break
 
-        return errors, d_errors
+        input = torch.tensor(data.test_input, requires_grad=True, dtype=torch.float32)
+        target = torch.tensor(data.test_output, requires_grad=True, dtype=torch.float32)
+        preds, errors, d_errors = thrust(input, target, prt=False)
+
+        test_errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
+        test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
+        test_preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
+        logger.info(f"Colony({self.colony_id}):: Training MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
+        
+        return torch.mean(test_errors).detach().numpy(), d_errors
 
     def feed_forward(self, in_data):
         for i, node in enumerate(self.in_nodes):
             node.recieve_fire(in_data[node.lag][node.point.name_idx])
 
-    def feed_backward(self,):
+    def feed_backward(self,err):
+        if self.__use_torch:
+            torch.mean(err).backward()
         for node in self.out_nodes:
-            node.recieve_backfire(node.d_err)
-        for node in self.nodes.values():
-            node.update_weights()
+            node.update_weights(lr=0.01)
 
     def get_output(self):
-        return [node.node_value for node in self.out_nodes]
+        return torch.stack([node.node_value for node in self.out_nodes])
 
 
 

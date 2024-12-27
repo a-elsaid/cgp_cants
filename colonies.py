@@ -41,15 +41,14 @@ def create_colony():
     )
 
     num_ants = np.random.randint(low=1, high=20)
-    population_size = np.random.randint(low=10, high=100)
+    population_size = np.random.randint(low=5, high=25)
     evaporation_rate = np.random.uniform(low=0.7, high=0.9)
     colony = Colony(
                     num_ants=num_ants, 
                     population_size=population_size, 
                     input_names=data.input_names,
                     output_names=data.output_names,
-                    train_input=data.train_input,
-                    train_target=data.train_output,
+                    data=data,
                     num_itrs=args.living_time,
     )
 

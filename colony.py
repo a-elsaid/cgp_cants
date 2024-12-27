@@ -6,6 +6,8 @@ from typing import List, Dict
 from util import function_dict, function_names
 from matplotlib import pyplot as plt
 import sys
+from timeseries import Timeseries
+
 
 import loguru
 logger = loguru.logger
@@ -19,10 +21,7 @@ class Colony():
                     population_size: int, 
                     input_names: List[str], 
                     output_names: List[str],
-                    train_input: np.ndarray,
-                    train_target: np.ndarray,
-                    test_input: np.ndarray = None,
-                    test_target: np.ndarray = None,
+                    data: Timeseries,
                     num_itrs: int = 10,
                     worker_id: int = None,
     ):
@@ -30,10 +29,7 @@ class Colony():
         Colony.count += 1
         self.num_itrs = num_itrs
         self.num_ants = num_ants
-        self.train_input = train_input
-        self.train_target = train_target
-        self.test_input = test_input
-        self.test_target = test_target
+        self.data = data
         self.best_solutions = []
         self.best_score = None
         self.avg_col_score = None
@@ -165,8 +161,8 @@ class Colony():
             graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}.gz")  
             
 
-            fit, _ = graph.evaluate(self.train_input, self.train_target)
-            fit = np.mean(fit)
+            fit, _ = graph.evaluate(self.data)
+            # fit = np.mean(fit)
             logger.info(f"Colony({self.id}): Fitness: {fit}")
             inserted = self.insert_to_population(fit, graph)
 

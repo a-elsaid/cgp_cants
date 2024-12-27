@@ -75,84 +75,146 @@ def dbscan(points, epsilon, min_pts):
     
     return clusters
 
+import torch
 # Functions
 def sin(x):
+    if type(x) == torch.Tensor:
+        return torch.sin(torch.sum(x))
     return np.mean(list(map(np.sin, x)))
 def cos(x):
+    if type(x) == torch.Tensor:
+        return torch.cos(torch.sum(x))
     return np.mean(list(map(np.cos, x)))
 def tan(x):
+    if type(x) == torch.Tensor:
+        return torch.tan(torch.sum(x))
     return np.mean(list(map(np.tan, x)))
 def sigmoid(x):
+    if type(x) == torch.Tensor:
+        return torch.sigmoid(torch.sum(x))
     def sig_fun(x):
         x = np.float64(x)
         return 1 / (1 + np.exp(-x))
     return np.mean(list(map(sig_fun, x)))
 def relu(x):
-    def relu_fun(x):
+    def relu_fun():
         return max(0, x)
-    return relu_fun(np.mean(x))
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.clamp(x, min=0))
+    return np.mean(list(torch.max(0, x)))
 def leaky_relu(x):
-    def leaky_relu_fun(x):
+    def leaky_relu_fun():
         return max(0.01*x, x)
-    return leaky_relu_fun(np.mean(x))
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.max(0.01*x, x))
+    return np.mean(list(map(leaky_relu_fun, x)))
 def add(x):
+    if type(x) == torch.Tensor:
+        return torch.sum(x)
     return np.sum(x)
 def multiply(x):
+    if type(x) == torch.Tensor:
+        return torch.prod(x)
     return np.prod(x)
 def tanh(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.tanh(x))
     return np.tanh(np.mean(x))
 def inverse(x):
-    return np.mean([1/max(j, 0.0001) for j in x])
+    if type(x) == torch.Tensor:
+        return torch.mean(1/(x+1e-8))
+    return np.mean(1/x+1e-8)
 def negate(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(x * -1)
     return np.mean(np.array(x) * -1)
-
 def maximum(x):
+    if type(x) == torch.Tensor:
+        return torch.max(x)
     return np.max(x)
 def minimum(x):
+    if type(x) == torch.Tensor:
+        return torch.min(x) 
     return np.min(x)
-def logic_add(x):
+def logic_and(x):
+    if type(x) == torch.Tensor:
+        return torch.sum(x > 0)
     return np.sum(np.array(x) > 0)
 def logic_or(x):
+    if type(x) == torch.Tensor:
+        return torch.sum(x > 0)
     return np.sum(np.array(x) > 0) > 0
 def exp(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.exp(x))
     return np.mean(np.exp(x))
 def log(x, base=np.e):
+    if type(x) == torch.Tensor:
+        y = torch.clip(x, 1e-10, None)
+        if base == np.e:
+            return torch.mean(torch.log(y))
+        else:
+            return torch.mean(torch.log(y) / np.log(base))
     x = np.clip(x, 1e-10, None)
     if base == np.e:
         return np.mean(np.log(x))  # Natural log
     else:
         return np.mean(np.log(x) / np.log(base))  # Log with custom base
-    
 def sqrt(x):
+    if type(x) == torch.Tensor:
+        signs = torch.sign(x)
+        return torch.mean(signs*torch.sqrt(torch.abs(x)))
     signs = np.sign(x)
     return np.mean(signs*np.sqrt(np.abs(x)))
 def square(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.square(torch.abs(x)))
     return np.mean(np.square(np.abs(x)))
 def cube(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.pow(x, 3))
     return np.mean(np.power(x, 3))
 def softmax(x):
+    if type(x) == torch.Tensor:
+        return torch.argmax(torch.exp(x)) / torch.sum(torch.exp(x))/len(x)
     return np.argmax(np.exp(x)) / np.sum(np.exp(x))/len(x)
 def cosh(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.cosh(x))
     return np.mean(np.cosh(x))
 def sinh(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(torch.sinh(x))
     return np.mean(np.sinh(x))
 
 def xor(x):
     # XOR over multiple inputs is true if an odd number of inputs are true
+    if type(x) == torch.Tensor:
+        return torch.mean(x) % 2
     return np.mean(x) % 2  # Returns 1 if the count of 1s is odd, 0 if even
 def xnor(x):
     # XNOR is the complement of XOR, true if an even number of inputs are true
     return 1 - xor(x)  # Returns 1 if XOR result is 0, 0 if XOR result is 1
 def ispositive(x):
+    if type(x) == torch.Tensor:
+        return torch.sum(x > 0) > 0
     return np.sum(np.array(x) > 0) > 0
 def isnegative(x):
+    if type(x) == torch.Tensor:
+        return torch.sum(x < 0) < 0
     return np.sum(np.array(x) < 0) < 0
 def iszero(x):
+    if type(x) == torch.Tensor:
+        s = torch.sum(x)
+        return s>-0.05 and s<0.05
     s = np.sum(x)
     return s>-0.05 and s<0.05
-
 def mean(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(x)
     return np.mean(x)
+
+'''    
 function_dict = {
                     0: add, 
                     1: multiply, 
@@ -167,7 +229,7 @@ function_dict = {
                     10: negate,
                     11: maximum,
                     12: minimum,
-                    13: logic_add,
+                    13: logic_and,
                     14: logic_or,
                     15: exp,
                     16: log,
@@ -198,7 +260,7 @@ function_names = {
                     10: 'negate',
                     11: 'maximum',
                     12: 'minimum',
-                    13: 'logic_add',
+                    13: 'logic_and',
                     14: 'logic_or',
                     15: 'exp',
                     16: 'log',
@@ -214,4 +276,28 @@ function_names = {
                     26: 'isnegative',
                     27: 'iszero',
                     28: 'mean',
+                }
+'''
+
+function_dict = {
+                    0: add, 
+                    1: multiply, 
+                    2: sin, 
+                    3: cos,
+                    4: tan,
+                    5: sigmoid,
+                    6: tanh,
+                    7: inverse,
+                    8: mean,
+                }
+function_names = {
+                    0: 'add', 
+                    1: 'multiply', 
+                    2: 'sin', 
+                    3: 'cos',
+                    4: 'tan',
+                    5: 'sigmoid',
+                    6: 'tanh',
+                    7: 'inverse',
+                    8: 'mean',
                 }

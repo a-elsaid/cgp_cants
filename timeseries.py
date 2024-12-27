@@ -36,18 +36,22 @@ class Timeseries:
                                                 self.input_data, 
                                                 self.output_data
                             )
-        self.norm_fun = self.normalization(norm_type)
-        (
-            self.train_input, 
-            self.train_output, 
-            self.test_input, 
-            self.test_output
-        ) = self.norm_fun(
-                            self.train_input, 
-                            self.train_output, 
-                            self.test_input, 
-                            self.test_output,
-                            )
+
+        if norm_type != "none":
+            logger.info("Normalizing")
+            self.norm_fun = self.normalization(norm_type)
+            (
+                self.train_input, 
+                self.train_output, 
+                self.test_input, 
+                self.test_output
+            ) = self.norm_fun(
+                                self.train_input, 
+                                self.train_output, 
+                                self.test_input, 
+                                self.test_output,
+                                )
+
         self.train_input = np.append(input_padding, self.train_input, axis=0)
         self.test_input = np.append(input_padding, self.test_input, axis=0)
 
@@ -107,11 +111,11 @@ class Timeseries:
         max_train = np.max(train_in, axis=0)
         min_train = np.min(train_in, axis=0)
         train_in = (train_in - min_train) / (max_train - min_train)
-        test_in = (test_in - min_train) / (max_train - min_train)
+        test_in  = (test_in - min_train)  / (max_train - min_train)
         max_train = np.max(train_out, axis=0)
         min_train = np.min(train_out, axis=0)
         train_out = (train_out - min_train) / (max_train - min_train)
-        test_out = (test_out - min_train) / (max_train - min_train)
+        test_out  = (test_out - min_train)  / (max_train - min_train)
         
         return train_in, train_out, test_in, test_out
       
