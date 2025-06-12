@@ -18,7 +18,7 @@ comm_mpi = MPI.COMM_WORLD
 comm_size = comm_mpi.Get_size()
 rank = comm_mpi.Get_rank()
 
-sys.path.insert(1, "/home/aaevse/loguru")
+sys.path.insert(1, "/home/damir/loguru")
 
 args = Args_Parser(sys.argv)
 

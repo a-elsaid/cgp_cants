@@ -346,9 +346,14 @@ class Graph:
             self.in_nodes.append(node)
     
 
-
-
-
+    def cross_entropy(self, y_true, y_pred, prt=False):
+        # y_true = np.array(y_true)
+        # y_pred = np.array(y_pred)
+        if prt: print(f"Prediction: {y_pred.item():.7f}, GT: {y_true.item():.7f}")
+        ce = - (y_true * torch.log(y_pred) + (1 - y_true) * torch.log(1 - y_pred))
+        d_ce = - (y_true / y_pred) + ((1 - y_true) / (1 - y_pred))
+        logger.trace(f"Cross Entropy: {ce} -- Derivative: {d_ce}")
+        return ce, d_ce
 
 
     def mse(self, y_true, y_pred, prt=False):
@@ -360,29 +365,58 @@ class Graph:
         logger.trace(f"Mean Squared Error: {mse} -- Derivative: {d_mse}")
         return mse, d_mse
 
+
+    def softmax_output(self, x, prt=False):
+        # x = np.array(x)
+        if prt: print(f"Softmax Input: {x}")
+        exp_x = torch.exp(x - torch.max(x))
+        softmax_x = exp_x / torch.sum(exp_x)
+        d_softmax_x = softmax_x * (1 - softmax_x)
+        logger.trace(f"Softmax Output: {softmax_x} -- Derivative: {d_softmax_x}")
+        return softmax_x, d_softmax_x
+
+
     def evaluate(self, data, cal_gradient=True):
         # target = target[:-self.lags]                         # Remove the first lags values
         num_epochs = 15
         input = torch.tensor(data.train_input, requires_grad=True, dtype=torch.float32)
-        target = torch.tensor(data.train_output, requires_grad=True, dtype=torch.float32)
+        target = torch.tensor(data.train_output, requires_grad=True, dtype=torch.float32) # TODO: change dtype
         
         def thrust(input, target, prt=False):
             preds, errors, d_errors = [], [], []
-            for i in range(0, len(input) - self.lags):
+            input_data, target_data = input, target
+            self.feed_forward(input_data)
+            out = self.get_output()
+            out, d_softmax_x = self.softmax_output(out, prt=prt)
 
-                input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
-                self.feed_forward(input_data)
-                out = self.get_output()
-                preds.append(out)
-                err, d_err = self.mse(target_data, out, prt)
+            preds.append(out)
+            err, d_err = self.cross_entropy(target_data, out, prt)
+            # if self.__use_torch:
+                # err.retain_grad()
+            errors.append(err)
+            d_errors.append(d_err)
+            for node, e in zip(self.out_nodes, d_err):
+                node.d_err = e
+            if cal_gradient:
+                self.feed_backward(err)
+
+
+            #for i in range(0, len(input) - self.lags):
+            #    input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
+            #    self.feed_forward(input_data)
+            #    out = self.get_output()
+            #    out, d_softmax_x = self.softmax_output(out, prt=prt)
+
+            #    preds.append(out)
+            #    err, d_err = self.cross_entropy(target_data, out, prt)
                 # if self.__use_torch:
                     # err.retain_grad()
-                errors.append(err)
-                d_errors.append(d_err)
-                for node, e in zip(self.out_nodes, d_err):
-                    node.d_err = e
-                if cal_gradient:
-                    self.feed_backward(err)
+            #    errors.append(err)
+            #    d_errors.append(d_err)
+            #    for node, e in zip(self.out_nodes, d_err):
+            #        node.d_err = e
+            #    if cal_gradient:
+            #        self.feed_backward(err)
             # self.feed_backward(torch.stack(errors))
             return preds, errors, d_errors
             
@@ -404,8 +438,8 @@ class Graph:
         test_errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
         test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
         test_preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
-        logger.info(f"Colony({self.colony_id}):: Training MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
-        
+        logger.info(f"Colony({self.colony_id}):: Training Log Loss: {torch.mean(train_errors):.6e}, TEST Log Loss: {torch.mean(test_errors):.6e}")
+
         return torch.mean(test_errors).detach().numpy(), d_errors
 
     def feed_forward(self, in_data):
