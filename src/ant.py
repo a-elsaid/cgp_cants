@@ -35,7 +35,7 @@ class Ant():
         elif new_point.get_node_type() == 1:
             self.new_in_points.append(new_point)
         else:  
-            logger.error(f"Unexpeted Type For Creating New Point: {point.get_node_type()}")
+            logger.error(f"Unexpeted Type For Creating New Point: {new_point.get_node_type()}")
             exit(1)
         self.update_position(new_point)
 
@@ -210,7 +210,18 @@ class Ant():
     """
     def update_best_behaviors(self, fitness) -> None:
         """
-        update ant charactaristics based on the rnn performance
+        Updates the list of the ant's best behaviors based on the provided fitness value.
+
+        If the list of best behaviors contains fewer than 10 entries, the current behavior
+        (fitness, explore_rate, sense_range) is appended. If the list already contains 10 entries,
+        the current behavior replaces the worst (last) entry only if its fitness is better (lower).
+        After updating, the list is sorted in ascending order of fitness.
+
+        Args:
+            fitness (float): The fitness value of the current behavior to consider for inclusion.
+
+        Returns:
+            None
         """
         if len(self.best_behaviors) < 10:
             self.best_behaviors.append(

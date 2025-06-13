@@ -5,8 +5,10 @@ from graph import Graph
 from typing import List, Dict
 from util import function_dict, function_names
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
 import sys
 from timeseries import Timeseries
+import pickle
 
 
 import loguru
@@ -139,7 +141,8 @@ class Colony():
                 space_is_not_explored = self.check_explored_space()
                 if space_is_not_explored:
                     logger.info(f"Colony({self.id}): Space is not fully explored: Boosting Exploration")
-                    self.evaporation_rate = 0.999
+                    logger.info(f"Colony({self.id}): Setting Evaporation Rate to 0.999: ON HOLD FOR NOW")
+                    # self.evaporation_rate = 0.999
                 else:
                     logger.info(f"Colony({self.id}): Space is fully explored: Resetting Exploration")
                     self.boost_exploration = False
@@ -147,29 +150,79 @@ class Colony():
             graph = self.ants_go(increase_exploration=self.boost_exploration)
             
 
-            '''
-            '''
-            fig = plt.figure(figsize=(40, 40))
-            ax = fig.add_subplot(111, projection='3d')
-            graph.plot_path_points(ax=ax, plt=plt)
-            graph.plot_nodes(ax=ax, plt=plt)
-            graph.plot_pheromones(ax=ax, plt=plt)
-            plt.savefig(f"colony_{self.id}_graph_{graph.id}.png")
-            plt.cla()
-            plt.clf()
-            plt.close()
-            graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}.gz")  
-            
-
             fit, _ = graph.evaluate(self.data)
-            # fit = np.mean(fit)
-            logger.info(f"Colony({self.id}): Fitness: {fit}")
+            wait = 10
+            while fit > 5 and wait > 0:
+                wait-=1
+                logger.info(f"Colony({self.id}): Fitness is None, ReGenerating & ReEvaluating Graph {wait} times left")
+                graph = self.ants_go(increase_exploration=self.boost_exploration)
+                fit, _ = graph.evaluate(self.data)
+                
+            logger.info(f"Colony({self.id}) - Graph({graph.id}): Fitness: {fit}")
             inserted = self.insert_to_population(fit, graph)
 
             self.evolve_ants(fit)
             if inserted:
                 self.update_scores()
                 self.space.deposited_pheromone(graph)
+                graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.gv")
+                graph.generate_eqn(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.eqn")
+                graph.write_structure(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.strct")
+                fig = plt.figure(figsize=(40, 40))
+                ax = fig.add_subplot(111, projection='3d')
+                # graph.plot_path_points(ax=ax, plt=plt)
+                graph.plot_paths(ax=ax, plt=plt)
+                # graph.plot_nodes(ax=ax, plt=plt)
+                graph.plot_pheromones(ax=ax, plt=plt)
+
+                function_colors = {
+                    0: 'red',
+                    1: 'blue',
+                    2: 'green',
+                    3: 'orange',
+                    4: 'purple',
+                    5: 'brown',
+                    6: 'cyan',
+                    7: 'magenta',
+                    8: 'gold',
+                }
+
+                # Manually create legend entries for whatever you added
+                custom_legend_items = [
+                    Line2D([0], [0], marker='*', linestyle='None', markeredgecolor='red', markerfacecolor='red', markersize=80, label='Node'),
+                    Line2D([0], [0], linestyle='-', color='gray', label='Ant Path', linewidth=6)
+                    # Line2D([0], [0], marker='o', linestyle='None', markeredgecolor='gray', markerfacecolor='gray', markersize=80, label='Space Point'),
+                ]
+                
+                for i, func_name in enumerate(function_names.values()):
+                    custom_legend_items.append(
+                        Line2D([0], [0], marker='o', linestyle='None', markeredgecolor=function_colors[i], markerfacecolor=function_colors[i], markersize=80, label=func_name)
+                    )
+
+                # Add the custom legend
+                ax.legend( 
+                            handles=custom_legend_items,
+                            loc='upper left',
+                            fontsize=40,               # Increase font size
+                            handlelength=4,            # Length of the legend handles
+                            borderpad=1.0,             # Padding inside the legend box
+                            labelspacing=1.2,          # Space between labels
+                            handletextpad=1.5,         # Space between handle and text
+                            frameon=True,              # Show legend frame
+                            framealpha=1.0,            # Opaque box
+                            borderaxespad=1.5          # Padding between legend and axes
+                )
+                plt.savefig(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.png")
+                plt.cla(); plt.clf(); plt.close()
+                graph.plot_target_predict(data=self.data, file_name=f"colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict")
+                self.save_graph(graph, f"colony_{self.id}_graph_{graph.id}_fit_{fit}.graph")
+                
+                fig = plt.figure(figsize=(40, 40))
+                ax = fig.add_subplot(111, projection='3d')
+                graph.plot_nodes(ax=ax, plt=plt)
+                plt.savefig(f"colony_{self.id}_nn_{graph.id}_fit_{fit}.png")
+                plt.cla(); plt.clf(); plt.close()
+
             self.space.add_new_points(graph.added_points)
             self.space.add_input_points(graph.added_in_points)
 
@@ -184,7 +237,7 @@ class Colony():
                 logger.info(f"Colony({self.id}): No Improvemnet->Resetting Evaporation Rate")
                 patience-=1
             if patience == 0:
-                self.self.boost_exploration = True
+                self.boost_exploration = True
                 patience = 10
             prev_inserted = inserted
 
@@ -280,3 +333,12 @@ class Colony():
         '''
 
         self.space.evaporation_rate = self.evaporation_rate
+
+
+    def save_graph(self, graph, name):
+        with open(name, "wb") as f:
+            pickle.dump(graph, f)
+
+    def load_graph(self, name):
+        with open(name, "rb") as f:
+            return pickle.load(f)

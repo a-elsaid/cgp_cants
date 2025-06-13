@@ -7,4 +7,6 @@ colony_*
 LOG*
 OUT*
 graph_*
+paper
+rm_files.sh
 __pycache__

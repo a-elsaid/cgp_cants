@@ -67,7 +67,7 @@ ACTIVATIONS = {
 class Args_Parser:
     def __init__(self, args):
         def add_params(param, count):
-            while count < len(args) and "-" not in args[count]:
+            while count < len(args) and args[count][0]!='-':
                 param.append(args[count])
                 count += 1
             return count - 1

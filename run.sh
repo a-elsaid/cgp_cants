@@ -1,10 +1,17 @@
 f_name="withBP"
 activation="tanh"
-#dataFolder="/Users/a.e./Dropbox/ANTS_CANTS/transformer_data/ETDataset/ETT-small"
+#dataFolder="/Users/a.e./Dropbox/ANTS_CANTS/datasets/2020_engie_wind"
+#dataFolder="/Users/a.e./Dropbox/ANTS_CANTS/datasets/2018_coal"
 dataFolder="/Users/a.e./Dropbox/ANTS_CANTS/datasets/2019_ngafid_transfer"
-INPUT="AltAGL AltB AltGPS AltMSL BaroA E1_CHT1 E1_CHT2 E1_CHT3 E1_CHT4 E1_EGT1 E1_EGT2 E1_EGT3 E1_EGT4 E1_FFlow E1_OilP E1_OilT E1_RPM FQtyL FQtyR GndSpd IAS LatAc NormAc OAT Pitch Roll TAS VSpd VSpdG WndDr WndSpd"
-OUTPUT="E1_CHT1 "
+INPUT="AltAGL AltB AltGPS AltMSL BaroA E1_CHT2 E1_CHT3 E1_CHT4 E1_EGT1 E1_EGT2 E1_EGT3 E1_EGT4 E1_FFlow E1_OilP E1_OilT E1_RPM FQtyL FQtyR GndSpd IAS LatAc NormAc OAT Pitch Roll TAS VSpd VSpdG WndDr WndSpd E1_CHT1"
+OUTPUT="E1_CHT1"
+#file_names="turbine_R80721_2013-2016_1.csv"
+file_names="c172_file_1.csv"
 cpu=9
 
-echo "Starting CANTS Experiment: " $i
-time mpirun -n $cpu --oversubscribe python3 ./colonies.py --data_dir $dataFolder --data_files c172_file_1.csv --input_names $INPUT --output_names $OUTPUT --log_dir LOG_single_cantsbp --out_dir OUT_single_cantsbp --living_time 1000  --term_log_level INFO --log_file_name cants_trial_$f_name_$i --file_log_level INFO --col_log_level INFO -nrm minmax --num_col 8
+for i in {1..9}; do
+    echo "Starting CANTS Experiment: " $i
+    echo $dataFolder
+    time mpirun -n $cpu --oversubscribe python3 ./src/colonies.py --data_dir $dataFolder --data_files $file_names --input_names $INPUT --output_names $OUTPUT --log_dir LOG_single_cantsbp --out_dir OUT_single_cantsbp --living_time 725  --term_log_level INFO --log_file_name cants_trial_$f_name_$i --file_log_level INFO --col_log_level INFO -nrm minmax --num_col 8 --comm_interval 2
+    exit
+done

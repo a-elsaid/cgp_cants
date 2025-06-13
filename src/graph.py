@@ -347,10 +347,6 @@ class Graph:
     
 
 
-
-
-
-
     def mse(self, y_true, y_pred, prt=False):
         # mse = np.array(y_true) - np.array(y_pred)
         err = y_true - y_pred
@@ -360,16 +356,11 @@ class Graph:
         logger.trace(f"Mean Squared Error: {mse} -- Derivative: {d_mse}")
         return mse, d_mse
 
-    def evaluate(self, data, cal_gradient=True):
-        # target = target[:-self.lags]                         # Remove the first lags values
-        num_epochs = 15
-        input = torch.tensor(data.train_input, requires_grad=True, dtype=torch.float32)
-        target = torch.tensor(data.train_output, requires_grad=True, dtype=torch.float32)
-        
-        def thrust(input, target, prt=False):
+
+    def single_thrust(self, input, target, prt=False, cal_gradient=True):
             preds, errors, d_errors = [], [], []
             for i in range(0, len(input) - self.lags):
-
+                
                 input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
                 self.feed_forward(input_data)
                 out = self.get_output()
@@ -385,9 +376,20 @@ class Graph:
                     self.feed_backward(err)
             # self.feed_backward(torch.stack(errors))
             return preds, errors, d_errors
+
+    def evaluate(self, data, cal_gradient=True):
+        num_epochs = 15
+        if self.__use_torch:
+            input = torch.tensor(data.train_input, requires_grad=True, dtype=torch.float32)
+            target = torch.tensor(data.train_output, requires_grad=True, dtype=torch.float32)
+        else:
+            input = data.train_input
+            target = data.train_output
+        
+        
             
         for epoch in range(1,num_epochs+1):
-            preds, errors, d_errors = thrust(input, target, prt=False)
+            preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=cal_gradient)
                     
             train_errors = torch.stack(errors) if self.__use_torch else np.array(errors)
             train_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
@@ -397,16 +399,24 @@ class Graph:
                 if torch.mean(train_errors) > 10:
                     break
 
-        input = torch.tensor(data.test_input, requires_grad=True, dtype=torch.float32)
-        target = torch.tensor(data.test_output, requires_grad=True, dtype=torch.float32)
-        preds, errors, d_errors = thrust(input, target, prt=False)
+        if self.__use_torch:
+            input = torch.tensor(data.test_input, requires_grad=False, dtype=torch.float32)
+            target = torch.tensor(data.test_output, requires_grad=False, dtype=torch.float32)
+        else:
+            input = data.test_input
+            target = data.test_output
+
+        preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=False)
 
         test_errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
         test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
         test_preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
-        logger.info(f"Colony({self.colony_id}):: Training MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
+        logger.info(f"Colony({self.colony_id}):: Trasining MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
         
-        return torch.mean(test_errors).detach().numpy(), d_errors
+        if self.__use_torch:
+            return torch.mean(test_errors).detach().numpy(), d_errors
+        else:
+            return np.mean(test_errors), d_errors
 
     def feed_forward(self, in_data):
         for i, node in enumerate(self.in_nodes):
@@ -422,7 +432,45 @@ class Graph:
         return torch.stack([node.node_value for node in self.out_nodes])
 
 
+    def plot_target_predict(self, data, file_name:str="")->None:
+        
+        if self.__use_torch:
+            input = torch.tensor(data.test_input, requires_grad=True, dtype=torch.float32)
+            target = torch.tensor(data.test_output, requires_grad=True, dtype=torch.float32)
+        else:
+            input = data.test_input
+            target = data.test_output   
 
+        preds, errors, _ = self.single_thrust(input, target, prt=False, cal_gradient=True)
+        errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
+        preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
+        
+        
+        E = torch.mean(errors).detach().numpy() if self.__use_torch else np.mean(errors)
+        logger.info(f"Colony({self.colony_id}):: Graph({self.id}): Testing Error {torch.mean(errors).item()}")   
+
+        preds = preds.detach().numpy()
+        target = target.detach().numpy()[self.lags:]
+        array = np.column_stack((preds, target))
+        
+
+
+        np.savetxt(file_name+".txt", array, fmt="%f", header="Predicted,Target", comments="", delimiter=",")
+
+        if file_name=="":
+            file_name = f"colony_{self.colony_id}_graph_{self.id}_target_predict"
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        ax.plot(target, label='Target')
+        ax.plot(preds, label='Predict')
+        ax.legend()
+        plt.savefig(file_name+".png")
+        # plt.show()
+        plt.cla()
+        plt.clf()
+        plt.close()
+
+   
 
 
 
@@ -462,6 +510,42 @@ class Graph:
             filename = f"graph_{self.id}.gv"
         dot.render(filename, view=False)
 
+    def generate_eqn(self, filename=None):
+        eqn = ""
+        for node in self.out_nodes:
+            for edge in node.inbound_edges.values():
+                eqn += f"{edge.source.get_eqn()} * {edge.weight:.4f} + "
+            eqn = f"[{eqn[:-3]}] / {len(node.inbound_edges)}\n"
+        if filename is not None:
+            with open(filename, "w") as f:
+                f.write(eqn)
+        return eqn
+
+    def write_structure(self, file_name=None):
+        structure = f"Input Nodes ({len(self.in_nodes)}):\n"
+        for node in self.in_nodes:
+            structure+= f"\t{node.point.name}\n"
+        
+        num_inner_nodes=0
+        num_edges = 0
+        
+        for n in self.nodes.values(): 
+            if n.type==0: num_inner_nodes+=1
+            num_edges+=len(n.outbound_edges)
+        
+        structure+= f"Number of Inner Nodes: {num_inner_nodes}\n"
+        
+        structure+= f"Output Nodes ({len(self.out_nodes)}):\n"
+        for node in self.out_nodes:
+            structure+=f"\t{node.point.name}\n"
+        
+        structure+=f"Number of Edges: {num_edges}\n"
+
+        if file_name:
+            with open(file_name, 'w') as f:
+                f.write(structure)
+        return structure
+
 
     def plot_path_points(self, ax=None, size=40, save_here=False, show=False, plt=None):
         if ax is None:
@@ -497,7 +581,7 @@ class Graph:
             plt.close('all')
 
 
-    def plot_nodes(self, ax=None, size=40, save_here=False, show=False, plt=None):
+    def plot_nodes(self, ax=None, size=400, save_here=False, show=False, plt=None):
         if ax is None:
             import matplotlib.pyplot as plt
             fig = plt.figure(figsize=(size, size))
@@ -506,6 +590,18 @@ class Graph:
         for node in self.nodes.values():
             ax.scatter(node.point.get_x(), node.point.get_y(), node.z, color='red', marker='*', s=size)
             ax.text(node.point.get_x(), node.point.get_y(), node.z, f"{node.id}({node.point.get_id()})", color='red', fontsize=10)
+            for edge in node.outbound_edges.values():
+                ax.quiver(node.point.get_x(), node.point.get_y(), node.z, 
+                            edge.target.point.get_x() - node.point.get_x(), 
+                            edge.target.point.get_y() - node.point.get_y(), 
+                            edge.target.z - node.z, 
+                            arrow_length_ratio=0.0,
+                            linewidth=10,
+                            color='blue',
+                            alpha=0.35,
+                        )
+            if node.type == 1:
+                ax.text(node.point.get_x(), node.point.get_y(), node.z, f"{node.point.name}", color='black', fontsize=30)
         if save_here:
             plt.savefig(f"graph_{self.id}_nodes.png")
             if show:
@@ -517,14 +613,81 @@ class Graph:
             fig = plt.figure(figsize=(size, size))
             ax = fig.add_subplot(111, projection='3d')
             save_here = True
+
+        # Distinct colors for each function index
+        function_colors = {
+            0: 'red',
+            1: 'blue',
+            2: 'green',
+            3: 'orange',
+            4: 'purple',
+            5: 'brown',
+            6: 'cyan',
+            7: 'magenta',
+            8: 'gold',
+        }
         for point in self.space.points:
+            func_index = round(point.get_f()*len(function_colors))  # assumes this returns an integer like 0-8
+            color = function_colors.get(func_index, 'black')  # fallback color
             sc = ax.scatter(
                                 point.get_x(), 
                                 point.get_y(), 
                                 point.get_z(), 
-                                s=point.get_f()*100, 
-                                c=point.get_pheromone(), 
-                                cmap='viridis', 
-                                alpha=0.2, 
+                                # c=point.get_f(), 
+                                # cmap='viridis', 
+                                color=color,
+                                s=point.get_pheromone()*100, 
+                                alpha=0.35, 
                                 marker='o'
-                            )
+                            )           
+
+    def plot_paths(self, ax=None, size=40, save_here=False, show=False, plt=None):
+        if ax is None:
+            import matplotlib.pyplot as plt
+            fig = plt.figure(figsize=(size, size))
+            ax = fig.add_subplot(111, projection='3d')
+            save_here = True
+        
+        cmap = plt.get_cmap('tab10')  # Use a colormap with distinct colors
+        colors = [cmap(i) for i in range(len(self.ants_paths))]
+
+        ax.set_xlabel('Neural Width'    , fontsize=50, color='black', labelpad=10)
+        ax.set_ylabel('Neural Depth'    , fontsize=50, color='black', labelpad=10)
+        ax.set_zlabel('Time Lag'        , fontsize=50, color='black', labelpad=10)
+        
+        for i,points in enumerate(self.ants_paths):
+            xs = [p.get_x() for p in points]
+            ys = [p.get_y() for p in points]
+            zs = [p.get_z() for p in points]
+            fs = [p.get_f() for p in points]
+
+            ax.text(xs[0], ys[0], zs[0], f"{points[0].name}", color=colors[i], fontsize=50)
+            
+            ax.scatter(xs, ys, zs, c=fs, cmap='viridis', marker='o', s=size)
+            # ax.plot(xs, ys, zs, color=colors[i])
+             
+            # self.draw_cone(ax=ax, start=[xs[0], ys[0], zs[0]], direction=[xs[-1]-xs[0], ys[-1]-ys[0], zs[-1]-zs[0]], color=colors[i])
+
+
+            for j in range(len(xs) - 1):
+                ax.quiver(
+                            xs[j], ys[j], zs[j], 
+                            xs[j+1] - xs[j], ys[j+1] - ys[j], zs[j+1] - zs[j], 
+                            arrow_length_ratio=0.0, 
+                            linewidth=10, 
+                            color=colors[i],
+                            alpha=0.5
+                        )
+                
+        if save_here:
+            plt.savefig(f"graph_{self.id}_paths.png")
+            if show:
+                plt.show()
+        if save_here:
+            plt.cla()
+            plt.clf()
+            plt.close('all')
+        # ipdb.set_trace()
+
+
+    

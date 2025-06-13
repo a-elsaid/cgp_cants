@@ -4,6 +4,7 @@ from math import ceil, floor
 from util import function_dict, function_names
 import loguru
 import torch
+import random
 
 def sigmoid(x):
     # x = max(-100.0, min(100.0, x))
@@ -109,6 +110,8 @@ class Node():
                                         next_func_id: function_dict[next_func_id],
                                     }
             )
+        random_id = random.choice(list(self.functions.keys()))
+        self.functions = {random_id: self.functions[random_id]}
 
 
     def add_edge(self, to_node, weight=1.0):
@@ -184,3 +187,24 @@ class Node():
     def adjust_lag(self, lags):
         self.lag = round(self.point.get_z() * lags)
         self.z = self.lag / max(1,lags)
+
+
+    def get_eqn(self):
+        eqn = ""
+        
+        node_funs = list(self.functions.keys())
+        operator = "+"
+        if function_names[node_funs[0]] == "multiply":
+            operator = "*"    
+
+        if self.type == 1:
+            return f"{self.point.name} "
+
+        for edge in self.inbound_edges.values():
+            eqn += f"{edge.source.get_eqn()} * {edge.weight} {operator} "
+        
+        eqn = f"({eqn[:-3]})"
+        if function_names[node_funs[0]] not in ['multiply', 'add']:
+            eqn = f"{node_funs[0]}{eqn}"
+
+        return eqn
