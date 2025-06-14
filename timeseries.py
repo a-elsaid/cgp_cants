@@ -96,13 +96,11 @@ class Timeseries:
         if not os.path.exists(file_name):
             logger.error(f" File: {file_name} Does Not Exist")
             sys.exit()
-        #all_param_names = list(set(self.input_names + self.output_names))
         input_param_names = list(set(self.input_names))
         output_param_names = list(set(self.output_names))
         data = pd.read_csv(file_name, sep=",", skipinitialspace=True)
         data[input_param_names] = data[input_param_names].astype(np.float32)
-        output_onehot = pd.get_dummies(data[output_param_names])
-        #data[output_param_names] = data[output_param_names].astype('category')
+        output_onehot = pd.get_dummies(data[output_param_names[0]], dtype=int, prefix=output_param_names[0])
         return data[in_params], output_onehot
 
     def none_normalize(self, data):
