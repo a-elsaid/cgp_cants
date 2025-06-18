@@ -373,6 +373,7 @@ class Graph:
         softmax_x = exp_x / torch.sum(exp_x)
         d_softmax_x = softmax_x * (1 - softmax_x)
         logger.trace(f"Softmax Output: {softmax_x} -- Derivative: {d_softmax_x}")
+        logger.info(f"Softmax Output: {softmax_x} -- Derivative: {d_softmax_x}")
         return softmax_x, d_softmax_x
 
 
@@ -384,39 +385,41 @@ class Graph:
         
         def thrust(input, target, prt=False):
             preds, errors, d_errors = [], [], []
-            input_data, target_data = input, target
-            self.feed_forward(input_data)
-            out = self.get_output()
-            out, d_softmax_x = self.softmax_output(out, prt=prt)
+            #input_data, target_data = input, target
+            #self.feed_forward(input_data)
+            #out = self.get_output()
+            #out, d_softmax_x = self.softmax_output(out, prt=prt)
 
-            preds.append(out)
-            err, d_err = self.cross_entropy(target_data, out, prt)
+            #preds.append(out)
+            #err, d_err = self.cross_entropy(target_data, out, prt)
             # if self.__use_torch:
                 # err.retain_grad()
-            errors.append(err)
-            d_errors.append(d_err)
-            for node, e in zip(self.out_nodes, d_err):
-                node.d_err = e
-            if cal_gradient:
-                self.feed_backward(err)
+            #errors.append(err)
+            #d_errors.append(d_err)
+            #for node, e in zip(self.out_nodes, d_err):
+            #    node.d_err = e
+            #if cal_gradient:
+            #    self.feed_backward(err)
 
 
-            #for i in range(0, len(input) - self.lags):
-            #    input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
-            #    self.feed_forward(input_data)
-            #    out = self.get_output()
-            #    out, d_softmax_x = self.softmax_output(out, prt=prt)
+            for i in range(0, len(input) - self.lags):
+                input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
+                self.feed_forward(input_data)
+                out = self.get_output()
+                #out, d_softmax_x = self.softmax_output(out, prt=prt)
+                out, d_softmax_x = self.softmax_output(out, prt=True)
+                #logger.info(f"\tColony({self.colony_id:3d}):: Thrust out: {out}")
 
-            #    preds.append(out)
-            #    err, d_err = self.cross_entropy(target_data, out, prt)
+                preds.append(out)
+                err, d_err = self.cross_entropy(target_data, out, prt)
                 # if self.__use_torch:
                     # err.retain_grad()
-            #    errors.append(err)
-            #    d_errors.append(d_err)
-            #    for node, e in zip(self.out_nodes, d_err):
-            #        node.d_err = e
-            #    if cal_gradient:
-            #        self.feed_backward(err)
+                errors.append(err)
+                d_errors.append(d_err)
+                for node, e in zip(self.out_nodes, d_err):
+                    node.d_err = e
+                if cal_gradient:
+                    self.feed_backward(err)
             # self.feed_backward(torch.stack(errors))
             return preds, errors, d_errors
             
@@ -427,7 +430,8 @@ class Graph:
             train_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
             train_preds = torch.stack(preds) if self.__use_torch else np.array(preds)
             if num_epochs>1: 
-                logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {(epoch):3d}/{num_epochs} Epoch MSE: {torch.mean(train_errors):.6e}")
+                #logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {(epoch):3d}/{num_epochs} Epoch Predictions: {train_preds}")
+                logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {(epoch):3d}/{num_epochs} Epoch Log Loss: {torch.mean(train_errors):.6e}")
                 if torch.mean(train_errors) > 10:
                     break
 
