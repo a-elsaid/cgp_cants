@@ -82,7 +82,7 @@ def living_colony(data, living_time, intervals):
 '''
 
 
-def environment(num_colonies):
+def environment(num_colonies, living_time):
     best_position_global = None
     fitness_global = -1
     BEST_POS_GOL = [0] * num_colonies
@@ -113,7 +113,7 @@ def environment(num_colonies):
             sys.exit()
         fitness_global = np.min(FIT_GOL)
         best_position_global = BEST_POS_GOL[np.argmin(FIT_GOL)]
-        logger.info(f"*** Finished {tim}/{args.living_time} Living Time ** Best Global Fitness: {fitness_global:.7e} ***")
+        logger.info(f"*** Finished {tim}/{living_time} Living Time ** Best Global Fitness: {fitness_global:.7e} ***")
         for c in range(1,num_colonies+1):
             comm_mpi.send((best_position_global, fitness_global), dest=c)
         
@@ -155,7 +155,7 @@ def main():
 
     if rank == 0: # Main Process
         logger.info(f"Main reporting for duty")
-        environment(args.num_colonies)
+        environment(args.num_colonies, args.living_time)
         return
     else:   # Worker Process
         data = Timeseries(

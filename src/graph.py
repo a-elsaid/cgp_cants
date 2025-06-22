@@ -356,18 +356,95 @@ class Graph:
         logger.trace(f"Mean Squared Error: {mse} -- Derivative: {d_mse}")
         return mse, d_mse
 
+    def bicross_entropy(self, y_true, y_pred, prt=False):
+        """
+        Binary Cross-Entropy loss (for binary or multi-label classification).
+        Works with both torch.Tensor and numpy.ndarray.
 
-    def single_thrust(self, input, target, prt=False, cal_gradient=True):
+        Parameters:
+            y_true: binary ground truth (0 or 1), tensor or array
+            y_pred: sigmoid output, same shape as y_true, in (0, 1)
+        Returns:
+            bce: scalar binary cross-entropy loss
+            d_bce: gradient w.r.t. prediction
+        """
+
+        # Detect backend
+        if isinstance(y_true, torch.Tensor):
+            err = y_true - y_pred
+            if prt: print(f"[Torch] Prediction: {y_pred.item():.7f}, GT: {y_true.item():.7f}, Err: {err.item():.7f}")
+            bce = -torch.mean(y_true * torch.log(y_pred + 1e-8) + (1 - y_true) * torch.log(1 - y_pred + 1e-8))
+            d_bce = err / (y_pred * (1 - y_pred) + 1e-8)
+
+        elif isinstance(y_true, (np.ndarray, int, float)) and isinstance(y_pred, (np.ndarray, int, float)):
+            y_true = np.array(y_true, dtype=np.float32)
+            y_pred = np.array(y_pred, dtype=np.float32)
+            err = y_true - y_pred
+            if prt: print(f"[NumPy/Scalar] Prediction: {float(y_pred):.7f}, GT: {float(y_true):.7f}, Err: {float(err):.7f}")
+            bce = -np.mean(y_true * np.log(y_pred + 1e-8) + (1 - y_true) * np.log(1 - y_pred + 1e-8))
+            d_bce = err / (y_pred * (1 - y_pred) + 1e-8)
+
+        logger.trace(f"Bicross Entropy: {bce} -- Derivative: {d_bce}")
+        return bce, d_bce
+    
+
+    def cross_entropy(self, y_true, y_pred, prt=False):
+        """
+        Compute cross-entropy for one-hot targets.
+        Works with either torch tensors or numpy arrays.
+        Assumes y_true is a one-hot encoded vector (Tensor or NumPy array).
+        Assumes y_pred is a softmaxed probability distribution.
+        
+        Parameters:
+            y_true: one-hot encoded class label (tensor or np.array)
+            y_pred: softmaxed output vector (tensor or np.array)
+        Returns:
+            ce: scalar cross-entropy loss
+            d_ce: gradient w.r.t. y_pred (softmax output)
+        """
+        if isinstance(y_true, torch.Tensor): # torch tensor
+            err = y_true - y_pred
+            ce = -torch.sum(y_true * torch.log(y_pred + 1e-8))
+            d_ce = y_pred - y_true
+            if prt:
+                pred_class = torch.argmax(y_pred).item()
+                true_class = torch.argmax(y_true).item()
+                print(f"[Torch] Pred: {pred_class}, GT: {true_class}, Softmax: {y_pred.tolist()}")
+        else:
+            err = y_true - y_pred
+            ce = -np.sum(y_true * np.log(y_pred + 1e-8))
+            d_ce = y_pred - y_true
+            if prt:
+                pred_class = int(np.argmax(y_pred))
+                true_class = int(np.argmax(y_true))
+                print(f"[NumPy] Pred: {pred_class}, GT: {true_class}, Softmax: {y_pred.tolist()}")
+
+        logger.trace(f"Cross Entropy: {ce} -- Derivative: {d_ce}")
+        return ce, d_ce
+
+
+    def single_thrust(self, input, target, prt=False, cal_gradient=True, cost_type="mse"):
             preds, errors, d_errors = [], [], []
             for i in range(0, len(input) - self.lags):
                 
                 input_data, target_data = input[i:i+max(1,self.lags)], target[i+self.lags]
                 self.feed_forward(input_data)
+
                 out = self.get_output()
+
+                if cost_type == "bicross_entropy":
+                    out = torch.sigmoid(out)      # Ensure out is in the range [0, 1] for bicross entropy
+                    err, d_err = self.bicross_entropy(target_data, out, prt)
+                elif cost_type == "cross_entropy":
+                    out = torch.softmax(out, dim=0)  # Apply softmax to ensure probabilities sum to
+                    err, d_err = self.cross_entropy(target_data, out, prt)
+                elif cost_type == "mse":  # default is mse
+                    out = torch.sigmoid(out)
+                    err, d_err = self.mse(target_data, out, prt)
+                else:
+                    raise ValueError(f"Unknown error type: {type}. Supported types are 'mse', 'bicross_entropy', and 'cross_entropy'.")
                 preds.append(out)
-                err, d_err = self.mse(target_data, out, prt)
-                # if self.__use_torch:
-                    # err.retain_grad()
+                
                 errors.append(err)
                 d_errors.append(d_err)
                 for node, e in zip(self.out_nodes, d_err):
@@ -377,7 +454,7 @@ class Graph:
             # self.feed_backward(torch.stack(errors))
             return preds, errors, d_errors
 
-    def evaluate(self, data, cal_gradient=True):
+    def evaluate(self, data, cal_gradient=True, cost_type="mse"):
         num_epochs = 15
         if self.__use_torch:
             input = torch.tensor(data.train_input, requires_grad=True, dtype=torch.float32)
@@ -389,7 +466,7 @@ class Graph:
         
             
         for epoch in range(1,num_epochs+1):
-            preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=cal_gradient)
+            preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=cal_gradient, cost_type=cost_type)
                     
             train_errors = torch.stack(errors) if self.__use_torch else np.array(errors)
             train_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
@@ -406,7 +483,7 @@ class Graph:
             input = data.test_input
             target = data.test_output
 
-        preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=False)
+        preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=False, cost_type=cost_type)
 
         test_errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
         test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
@@ -432,7 +509,7 @@ class Graph:
         return torch.stack([node.node_value for node in self.out_nodes])
 
 
-    def plot_target_predict(self, data, file_name:str="")->None:
+    def plot_target_predict(self, data, file_name:str="", cost_type="mse")->None:
         
         if self.__use_torch:
             input = torch.tensor(data.test_input, requires_grad=True, dtype=torch.float32)
@@ -441,7 +518,7 @@ class Graph:
             input = data.test_input
             target = data.test_output   
 
-        preds, errors, _ = self.single_thrust(input, target, prt=False, cal_gradient=True)
+        preds, errors, _ = self.single_thrust(input, target, prt=False, cal_gradient=True, cost_type=cost_type)
         errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
         preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
         

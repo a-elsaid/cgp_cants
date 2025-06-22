@@ -150,7 +150,7 @@ class Colony():
             graph = self.ants_go(increase_exploration=self.boost_exploration)
             
 
-            fit, _ = graph.evaluate(self.data)
+            fit, _ = graph.evaluate(self.data, cost_type="mse")
             wait = 10
             while fit > 5 and wait > 0:
                 wait-=1
@@ -214,7 +214,7 @@ class Colony():
                 )
                 plt.savefig(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.png")
                 plt.cla(); plt.clf(); plt.close()
-                graph.plot_target_predict(data=self.data, file_name=f"colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict")
+                graph.plot_target_predict(data=self.data, file_name=f"colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict", cost_type="mse")
                 self.save_graph(graph, f"colony_{self.id}_graph_{graph.id}_fit_{fit}.graph")
                 
                 fig = plt.figure(figsize=(40, 40))
