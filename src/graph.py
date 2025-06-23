@@ -11,6 +11,12 @@ import torch
 
 import ipdb
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+def softmax(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0) if x.ndim == 1 else e_x / e_x.sum(axis=1, keepdims=True)
+
 logger = loguru.logger
 logger.add(sys.stdout, level="INFO")
 
@@ -433,13 +439,23 @@ class Graph:
                 out = self.get_output()
 
                 if cost_type == "bicross_entropy":
-                    out = torch.sigmoid(out)      # Ensure out is in the range [0, 1] for bicross entropy
+                    if isinstance(out, torch.Tensor): # torch tensor
+                        out = torch.sigmoid(out)      # Ensure out is in the range [0, 1] for bicross entropy
+                    else:
+                        out = sigmoid(out)
                     err, d_err = self.bicross_entropy(target_data, out, prt)
                 elif cost_type == "cross_entropy":
-                    out = torch.softmax(out, dim=0)  # Apply softmax to ensure probabilities sum to
+                    if isinstance(out, torch.Tensor): # torch tensor
+                        out = torch.softmax(out, dim=0)  # Apply softmax to ensure probabilities sum to
+                    else:
+                        out = softmax(out) # Apply softmax to ensure probabilities sum to 1
                     err, d_err = self.cross_entropy(target_data, out, prt)
                 elif cost_type == "mse":  # default is mse
-                    out = torch.sigmoid(out)
+                    if isinstance(out, torch.Tensor): # torch tensor
+                        out = torch.sigmoid(out) # apply sigmoid to ensure output is in the range [0, 1]
+                    else:
+                        out = sigmoid(out) # apply sigmoid to ensure output is in the range [0, 1]
+                    
                     err, d_err = self.mse(target_data, out, prt)
                 else:
                     raise ValueError(f"Unknown error type: {type}. Supported types are 'mse', 'bicross_entropy', and 'cross_entropy'.")
