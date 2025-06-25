@@ -1,4 +1,5 @@
 .DS_Store
+*.swp
 *.csv
 *.png
 *.pdf

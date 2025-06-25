@@ -8,6 +8,7 @@ import graphviz as gv
 from time import time
 import sys
 import torch
+from util import function_names
 
 import ipdb
 
@@ -580,7 +581,8 @@ class Graph:
         # Add nodes
         for node in self.nodes.values():
             if node.type == 0:
-                dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()})")
+                # dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()})")
+                dot.node(str(node.id), label=f"{function_names[list(node.functions.keys())[0]]}")
             elif node.type==1:
                 dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()}) {node.point.name}", shape='box', style='filled', fillcolor='lightblue')
             elif node.type==2:

@@ -209,9 +209,9 @@ def kickoff_colonies(
     else:
         data = Timeseries(
                     data_files=data_files,
-                    input_params=input_names,
-                    output_params=output_names,
-                    norm_type=normalization,
+                    input_params=input_params,
+                    output_params=output_params,
+                    norm_type=norm_type,
                     future_time=future_time,
                     data_dir=data_dir,
                 )
@@ -221,7 +221,7 @@ def kickoff_colonies(
             logger.error(
                 f"""
                     Colonies evolution intervals ({intervals}) less 
-                    than the total number of iterations ({args.living_time+1})
+                    than the total number of iterations ({living_time+1})
                 """
             )
             sys.exit()

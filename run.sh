@@ -10,11 +10,11 @@ OUTPUT="Supp_Fuel_Flow"
 #file_names="turbine_R80721_2013-2016_1.csv"
 #file_names="c172_file_1.csv"
 file_names="burner_0.csv"
-cpu=9
+cpu=5
 
 for i in {1..9}; do
     echo "Starting CANTS Experiment: " $i
     echo $dataFolder
-    time mpirun -n $cpu --oversubscribe python3 ./src/colonies.py --data_dir $dataFolder --data_files $file_names --input_names $INPUT --output_names $OUTPUT --log_dir LOG_single_cantsbp --out_dir OUT_single_cantsbp --living_time 725  --term_log_level INFO --log_file_name cants_trial_$f_name_$i --file_log_level INFO --col_log_level INFO -nrm minmax --num_col 8 --comm_interval 2
+    time mpirun -n $cpu --oversubscribe python3 ./src/colonies.py --data_dir $dataFolder --data_files $file_names --input_names $INPUT --output_names $OUTPUT --log_dir LOG_single_cantsbp --out_dir OUT_single_cantsbp --living_time 75  --term_log_level INFO --log_file_name cants_trial_$f_name_$i --file_log_level INFO --col_log_level INFO -nrm minmax --comm_interval 2 #--num_col 2
     exit
 done
