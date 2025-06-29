@@ -39,7 +39,7 @@ def create_colony(data=None, living_time=None):
 
 
 
-def living_colony(data, living_time, intervals):
+def living_colony(data, living_time, intervals, cost_type="mse"):
     """
     used by threads to get the colonies to live in parallel
     """
@@ -51,9 +51,9 @@ def living_colony(data, living_time, intervals):
 
 
     for tim in range(intervals, living_time + 1, intervals):
-        colony.life(num_itrs=intervals, total_itrs=living_time)
+        colony.life(num_itrs=intervals, total_itrs=living_time, cost_type=cost_type)
         (   colony_fit, 
-            colony_position
+            colony_position,
         ) = colony.get_col_fit(rank=rank, avg=False)
 
         logger.info( 
@@ -197,6 +197,7 @@ def kickoff_colonies(
                     norm_type="minmax",
                     communication_intervals=2,
                     living_time=300,
+                    cost_type="mse",
                     ):
     """
     kick off the colonies
@@ -216,7 +217,7 @@ def kickoff_colonies(
                     data_dir=data_dir,
                 )
         logger.info(f"Worker {rank} reporting for duty")
-        intervals = args.communication_intervals
+        intervals = communication_intervals
         if intervals > living_time + 1:
             logger.error(
                 f"""
@@ -225,7 +226,7 @@ def kickoff_colonies(
                 """
             )
             sys.exit()
-        living_colony(data=data, living_time=living_time)
+        living_colony(data=data, living_time=living_time, cost_type=cost_type)
 
 
 # if rank==0:

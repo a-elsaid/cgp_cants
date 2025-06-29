@@ -130,7 +130,7 @@ class Colony():
             ant.update_best_behaviors(fit)
             ant.evolve_behavior()
 
-    def life(self, num_itrs=None, total_itrs=None):
+    def life(self, num_itrs=None, total_itrs=None, cost_type="mse"):
         if num_itrs:
             self.num_itrs = num_itrs
         patience = 10
@@ -150,7 +150,7 @@ class Colony():
             graph = self.ants_go(increase_exploration=self.boost_exploration)
             
 
-            fit, _ = graph.evaluate(self.data, cost_type="mse")
+            fit, _ = graph.evaluate(self.data, cost_type=cost_type)
             wait = 10
             while fit > 5 and wait > 0:
                 wait-=1
@@ -214,7 +214,7 @@ class Colony():
                 )
                 plt.savefig(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.png")
                 plt.cla(); plt.clf(); plt.close()
-                graph.plot_target_predict(data=self.data, file_name=f"colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict", cost_type="mse")
+                graph.plot_target_predict(data=self.data, file_name=f"colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict", cost_type=cost_type)
                 self.save_graph(graph, f"colony_{self.id}_graph_{graph.id}_fit_{fit}.graph")
                 
                 fig = plt.figure(figsize=(40, 40))
