@@ -65,7 +65,8 @@ class Node():
             self.pick_node_functions(function_dict)
         self.adjust_lag(lags=lags-1)    # Adjust lag levels based on the z value of the point
 
-    def get_cluseter(self):
+
+    def get_cluster(self):
         return self.__cluster
 
     def set_cluster(self, cluster):

@@ -7,12 +7,14 @@ import sys
 import pickle
 import threading as th
 import numpy as np
-from loguru import logger
+import loguru
 from colony import Colony
 from timeseries import Timeseries
 from helper import Args_Parser
 from search_space import Space
 from mpi4py import MPI
+logger = loguru.logger
+
 
 comm_mpi = MPI.COMM_WORLD
 comm_size = comm_mpi.Get_size()
@@ -32,44 +34,53 @@ def create_colony(data=None, living_time=None):
                     output_names=data.output_names,
                     data=data,
                     num_itrs=living_time,
+                    worker_id=rank,
     )
-
     return colony
 
-
-
-
-def living_colony(data, living_time, intervals, cost_type="mse"):
+def living_colony(data, living_time, intervals, cost_type="mse", train_epochs=10):
     """
     used by threads to get the colonies to live in parallel
     """
     logger.info(f"Starting Colony: Lead Worker({rank}) reporting for duty")
     colony = create_colony(data=data, living_time=living_time)
+
     worker, best_position_global, fitness_global = comm_mpi.recv(source=0)
     colony.id = worker
     logger.info(f"Worker {rank} Received Main's Kickoff Msg")
 
 
     for tim in range(intervals, living_time + 1, intervals):
-        colony.life(num_itrs=intervals, total_itrs=living_time, cost_type=cost_type)
+        # colony.life(num_itrs=intervals, total_itrs=living_time, cost_type=cost_type)
+        # colony.life_processes(num_itrs=intervals, total_itrs=living_time, cost_type=cost_type)
+        colony.life_threads(num_itrs=intervals, total_itrs=living_time, cost_type=cost_type, train_epochs=train_epochs)
         (   colony_fit, 
             colony_position,
         ) = colony.get_col_fit(rank=rank, avg=False)
 
         logger.info( 
                         f"Worker({rank}) reporting " +
-                        f"its OverallFitness: {fitness_global} " +
+                        f"its Overall Fitness: {fitness_global:.3f} " +
                         f"for Colony {colony.id} " +
                         f"No. Ants ({colony.num_ants}) " +
-                        f"ER ({colony.evaporation_rate}) " +
-                        f"MR ({colony.mortality_rate})  " +
-                        f"({tim}/{living_time})"
+                        f"ER ({colony.evaporation_rate:.3f}) " +
+                        f"MR ({colony.mortality_rate:.3f})  " +
+                        f"({tim}/{living_time} Living Time)"
                     )
         comm_mpi.send((tim, colony_position, colony_fit), dest=0)
         best_position_global, fitness_global = comm_mpi.recv(source=0)
         colony.update_velocity(best_position_global)
         colony.update_position()
-        logger.info(f"***---===>>> Colony({colony.id}) Best Global Pos: {best_position_global})  Best Col Pos: {colony.pso_best_position} No Ants: {colony.num_ants} ER: {colony.evaporation_rate}  MR: {colony.mortality_rate}")
+        logger.info(
+                        f"\n***>>>===---\n"
+                        f"Colony({colony.id})::\n" +
+                        f"\tBest Global Pos: (Ants:{best_position_global[0]}, MortRate:{best_position_global[1]:.2f}, EvapRate:{best_position_global[2]:.2f})\n" +
+                        f"\tBest Col Pos: (Ants:{colony.pso_best_position[0]}, MortRate:{colony.pso_best_position[1]:.2f}, EvapRate:{colony.pso_best_position[2]:.2f})\n" +
+                        f"\tNo Ants: {colony.num_ants} " +
+                        f"\tER: {colony.evaporation_rate:.3f}  " +
+                        f"\tMR: {colony.mortality_rate:.3f}\n" +
+                        f"---===<<<***"
+                    )
 
     comm_mpi.send(None, dest=0)
     comm_mpi.send(colony, dest=0)
@@ -82,7 +93,7 @@ def living_colony(data, living_time, intervals, cost_type="mse"):
 '''
 
 
-def environment(num_colonies, living_time):
+def environment(living_time):
     best_position_global = None
     fitness_global = -1
     BEST_POS_GOL = [0] * num_colonies
@@ -119,9 +130,9 @@ def environment(num_colonies, living_time):
         
     '''
         **** TODO ****
-        add code to save the best performing RNN in each round of intervals    
+        add code to save the best performing GRAPH in each round of intervals    
         this can be done by sending a signal to the lead-worker to save its
-        best RNN if its group did the best job
+        best GRAPH if its group did the best job
     '''
     
     best_colony = best_colonies[0]
@@ -155,7 +166,7 @@ def main():
 
     if rank == 0: # Main Process
         logger.info(f"Main reporting for duty")
-        environment(args.num_colonies, args.living_time)
+        environment(args.living_time)
         return
     else:   # Worker Process
         data = Timeseries(
@@ -176,7 +187,7 @@ def main():
                 """
             )
             sys.exit()
-        living_colony(data=data, living_time=args.living_time, intervals=intervals)
+        living_colony(data=data, living_time=args.living_time, intervals=intervals, cost_type=args.loss_fun, train_epochs=args.bp_epochs)
 
 
 if __name__ == "__main__":
@@ -188,7 +199,6 @@ def kickoff_colonies(
                     input_params,
                     output_params,
                     data_dir,
-                    num_colonies,
                     future_time=0,
                     term_log_level="INFO",
                     log_file_name="cants",
@@ -205,7 +215,7 @@ def kickoff_colonies(
     logger_setup()
     if rank == 0:
         logger.info(f"Main reporting for duty")
-        environment(num_colonies)
+        environment(living_time=living_time)
         return
     else:
         data = Timeseries(

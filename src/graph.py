@@ -19,6 +19,7 @@ def softmax(x):
     return e_x / e_x.sum(axis=0) if x.ndim == 1 else e_x / e_x.sum(axis=1, keepdims=True)
 
 logger = loguru.logger
+logger.remove()  # Remove default logger
 logger.add(sys.stdout, level="INFO")
 
 class Graph:
@@ -60,6 +61,12 @@ class Graph:
         self.add_lagged_inputs()
 
         # ipdb.set_trace()
+
+    def get_added_points(self,):
+        return self.added_points
+    
+    def get_added_in_points(self,):
+        return self.added_in_points
 
     
     def get_edges(self,):
@@ -471,8 +478,7 @@ class Graph:
             # self.feed_backward(torch.stack(errors))
             return preds, errors, d_errors
 
-    def evaluate(self, data, cal_gradient=True, cost_type="mse"):
-        num_epochs = 15
+    def evaluate(self, data, cal_gradient=True, cost_type="mse", num_epochs=1, thread_id=None):
         if self.__use_torch:
             input = torch.tensor(data.train_input, requires_grad=True, dtype=torch.float32)
             target = torch.tensor(data.train_output, requires_grad=True, dtype=torch.float32)
@@ -480,7 +486,7 @@ class Graph:
             input = data.train_input
             target = data.train_output
         
-        
+        thd = f" Thread({thread_id})" if thread_id is not None else " "
             
         for epoch in range(1,num_epochs+1):
             preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=cal_gradient, cost_type=cost_type)
@@ -489,7 +495,7 @@ class Graph:
             train_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
             train_preds = torch.stack(preds) if self.__use_torch else np.array(preds)
             if num_epochs>1: 
-                logger.info(f"\tColony({self.colony_id:3d}):: Epoch: {(epoch):3d}/{num_epochs} Epoch MSE: {torch.mean(train_errors):.6e}")
+                logger.info(f"\tColony({self.colony_id:3d}){thd}:: Epoch: {(epoch):3d}/{num_epochs} Epoch MSE: {torch.mean(train_errors):.6e}")
                 if torch.mean(train_errors) > 10:
                     break
 
@@ -503,9 +509,10 @@ class Graph:
         preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=False, cost_type=cost_type)
 
         test_errors   = torch.stack(errors) if self.__use_torch else np.array(errors)
-        test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
-        test_preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
-        logger.info(f"Colony({self.colony_id}):: Trasining MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
+        # test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
+        # test_preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
+        
+        logger.info(f"Colony({self.colony_id}){thd}:: Training MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
         
         if self.__use_torch:
             return torch.mean(test_errors).detach().numpy(), d_errors
