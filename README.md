@@ -25,12 +25,18 @@ Based on the soon-to-be-published journal article “CANTS-GP: A Nature-Inspired
 ## Prerequisites
 
 - **Python**: Version 3.8 or higher.  
-- **System**:  
-  - [Graphviz](https://graphviz.org/) (install via `apt`, `brew`, or your package manager).  
+- **System Dependencies:**
+    - Graphviz (CLI & dev tools) for visualization
+        - Debian/Ubuntu: `sudo apt-get install graphviz`
+        - macOS: `brew install graphviz`
+    - MPI (OpenMPI or MPICH) for distributed execution
+        - Debian/Ubuntu: sudo apt-get install openmpi-bin libopenmpi-dev
+        - macOS: brew install open-mpi
 - **Python Packages**:  
   ```bash
   pip install numpy pandas scikit-learn torch graphviz loguru matplotlib
   ```
+  
 
 ## Repository Structure
 
