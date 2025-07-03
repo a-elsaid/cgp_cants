@@ -3,7 +3,7 @@
 GP-CANTS (Genetic Programming CANTS) is a nature-inspired metaheuristic framework for graph-based genetic programs, designed to automate neural architecture search (NAS) and produce interpretable computational graphs. Combining ant colony optimization (CANTS) with genetic programming (GP) and optional backpropagation, GP-CANTS enables multi-colony, multi-agent exploration of an unbounded continuous search space, yielding adaptive and scalable architectures.
 
 ## About This Work
-Based on the soon-to-be-published journal article “CANTS-GP: A Nature-Inspired Metaheuristic for Graph-Based Genetic Programs” (ElSaid & Desell) and accepted as a poster at the upcoming EvoStar conference, GP-CANTS introduces several key innovations:
+Based on the soon-to-be-published journal article “CANTS-GP: A Nature-Inspired Metaheuristic for Graph-Based Genetic Programs” (ElSaid & Desell) and accepted as a poster at the GECCO 2025 conference, GP-CANTS introduces several key innovations:
 
   - **Multi-Colony Evolution:** Parallel ant colonies evolve both at the agent level (ant movement strategies and pheromone control) and at the colony level (parameter optimization via PSO).
   - **Continuous 3D Search Space:** Ant agents traverse a three-dimensional continuous space, with paths clustered by DBSCAN to form graph nodes and DFS-based cycle removal ensuring valid computational graphs.
