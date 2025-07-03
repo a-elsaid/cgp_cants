@@ -23,7 +23,7 @@ rank = comm_mpi.Get_rank()
 worker_group = np.arange(1,comm_size)
 num_colonies = comm_size - 1
 
-def create_colony(data=None, living_time=None):
+def create_colony(data=None, living_time=None, out_dir="./OUT"):
     num_ants = np.random.randint(low=1, high=20)
     population_size = np.random.randint(low=5, high=25)
     evaporation_rate = np.random.uniform(low=0.7, high=0.9)
@@ -35,15 +35,16 @@ def create_colony(data=None, living_time=None):
                     data=data,
                     num_itrs=living_time,
                     worker_id=rank,
+                    out_dir=out_dir,
     )
     return colony
 
-def living_colony(data, living_time, intervals, cost_type="mse", train_epochs=10):
+def living_colony(data, living_time, intervals, cost_type="mse", train_epochs=10, out_dir="./OUT"):
     """
     used by threads to get the colonies to live in parallel
     """
     logger.info(f"Starting Colony: Lead Worker({rank}) reporting for duty")
-    colony = create_colony(data=data, living_time=living_time)
+    colony = create_colony(data=data, living_time=living_time, out_dir=out_dir)
 
     worker, best_position_global, fitness_global = comm_mpi.recv(source=0)
     colony.id = worker
@@ -187,7 +188,14 @@ def main():
                 """
             )
             sys.exit()
-        living_colony(data=data, living_time=args.living_time, intervals=intervals, cost_type=args.loss_fun, train_epochs=args.bp_epochs)
+        living_colony(
+                        data=data, 
+                        living_time=args.living_time, 
+                        intervals=intervals, 
+                        cost_type=args.loss_fun, 
+                        train_epochs=args.bp_epochs, 
+                        out_dir=args.out_dir,
+                    )
 
 
 if __name__ == "__main__":

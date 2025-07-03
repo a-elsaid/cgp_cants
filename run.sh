@@ -19,7 +19,8 @@ OUTPUT[burner]="Supp_Fuel_Flow"
 FILE_NAMES[wind]="turbine_R80721_2013-2016_1.csv"
 FILE_NAMES[c172]="c172_file_1.csv"
 FILE_NAMES[burner]="burner_0.csv"
-cpu=9 # this will create 1 Enviroment Process & cpu-1 Colonies
+
+cpu=9                  # this will create 1 Enviroment Process & cpu-1 Colonies
 
 set=burner
 
@@ -30,8 +31,8 @@ for i in {1..9}; do
     --data_files ${FILE_NAMES[$set]} \
     --input_names ${INPUT[$set]} \
     --output_names ${OUTPUT[$set]} \
-    --log_dir LOG_single_cantsbp \
-    --out_dir OUT_single_cantsbp \
+    --log_dir LOG\
+    --out_dir OUT\
     --living_time 90  \
     --term_log_level INFO \
     --log_file_name cants_trial_$f_name_$i \

@@ -60,6 +60,7 @@ class Colony():
                     data: Timeseries,
                     num_itrs: int = 10,
                     worker_id: int = None,
+                    out_dir: str = "./OUT",
     ):
 
         self.id = Colony.count + 1
@@ -91,6 +92,7 @@ class Colony():
         logger.info(f"Colony({self.id}) (Worker_{worker_id}):: Created with {num_ants} ants and {population_size} population size")
 
         self._lock = threading.Lock()
+        self.out_dir = out_dir
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -180,12 +182,12 @@ class Colony():
     
     def _dump_graph(self, graph, fit, cost_type="mse", plot=False):
         
-        graph.visualize_graph(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.gv")
-        graph.generate_eqn(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.eqn")
-        self.save_graph(graph, f"colony_{self.id}_graph_{graph.id}_fit_{fit}.graph")
+        graph.visualize_graph(f"{self.out_dir}/colony_{self.id}_graph_{graph.id}_fit_{fit}.gv")
+        graph.generate_eqn(f"{self.out_dir}/colony_{self.id}_graph_{graph.id}_fit_{fit}.eqn")
+        self.save_graph(graph, f"{self.out_dir}/colony_{self.id}_graph_{graph.id}_fit_{fit}.graph")
         if not plot:
             return
-        graph.write_structure(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.strct")
+        graph.write_structure(f"{self.out_dir}/colony_{self.id}_graph_{graph.id}_fit_{fit}.strct")
         fig = plt.figure(figsize=(40, 40))
         ax = fig.add_subplot(111, projection='3d')
         # graph.plot_path_points(ax=ax, plt=plt)
@@ -230,14 +232,14 @@ class Colony():
                     framealpha=1.0,            # Opaque box
                     borderaxespad=1.5          # Padding between legend and axes
         )
-        plt.savefig(f"colony_{self.id}_graph_{graph.id}_fit_{fit}.png")
+        plt.savefig(f"{self.out_dir}/colony_{self.id}_graph_{graph.id}_fit_{fit}.png")
         plt.cla(); plt.clf(); plt.close()
-        graph.plot_target_predict(data=self.data, file_name=f"colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict", cost_type=cost_type)
+        graph.plot_target_predict(data=self.data, file_name=f"{self.out_dir}/colony_{self.id}_graph_{graph.id}_fit_{fit}_target_predict", cost_type=cost_type)
 
         fig = plt.figure(figsize=(40, 40))
         ax = fig.add_subplot(111, projection='3d')
         graph.plot_nodes(ax=ax, plt=plt)
-        plt.savefig(f"colony_{self.id}_nn_{graph.id}_fit_{fit}.png")
+        plt.savefig(f"{self.out_dir}/colony_{self.id}_nn_{graph.id}_fit_{fit}.png")
         plt.cla(); plt.clf(); plt.close()
 
     def _gen_and_eval(self, increase_exploration: bool, cost_type: str, train_epochs: int = 10):
