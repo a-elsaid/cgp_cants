@@ -51,27 +51,82 @@ Based on the soon-to-be-published journal article “CANTS-GP: A Nature-Inspired
 ## Usage
 ### 1. Configure run.sh
 
-Edit the arrays in run.sh to point to your local datasets, input/output variable names, and file names. For example:
-  
-  ```
-  # Set dataset directories
-  DATA_DIRS[wind]="/path/to/your/wind_dataset"
-  DATA_DIRS[c172]="/path/to/your/c172_dataset"
-  
-  # Define input features (space-separated)
-  INPUT[wind]="AltAGL AltB AltGPS AltMSL BaroA E1_CHT2 ..."
-  # Define output target(s)
-  OUTPUT[wind]="E1_CHT1"
-  # List the data file names in each directory
-  FILE_NAMES[wind]="wind1.csv wind2.csv"
-  ```
+This script uses a set of bash arrays and variables to parameterize your experiments. In particular:
 
+- `DATA_DIRS[<key>]` maps each dataset key (e.g., wind, c172) to its directory path.
+- `INPUT[<key>]` lists the space-separated feature names used as inputs for that dataset.
+- `OUTPUT[<key>]` specifies the target variable(s) for prediction.
+- `FILE_NAMES[<key>]` enumerates the CSV filenames to be processed.
+
+You can also adjust top‑level variables like LOG_DIR, OUT_DIR, LIVING_TIME, and MPI settings (e.g., -np for mpirun) directly at the top of run.sh to control logging locations, output folders, runtime duration, and distributed execution parameters.
+
+Edit the arrays in run.sh to point to your local datasets, input/output variable names, and file names. For example:
+
+  ```bash
+    # Set dataset directories
+    DATA_DIRS[wind]="/path/to/your/wind_dataset"
+    DATA_DIRS[c172]="/path/to/your/c172_dataset"
+    
+    # Define input features (space-separated)
+    INPUT[wind]="AltAGL AltB AltGPS AltMSL BaroA E1_CHT2 ..."
+    # Define output target(s)
+    OUTPUT[wind]="E1_CHT1"
+    # List the data file names in each directory
+    FILE_NAMES[wind]="wind1.csv wind2.csv"
+```
 ## 2. Run the Experiments
 
 Simply execute:
+
 ```bash
   bash run.sh
 ```
+
+This will launch the configured experiments in sequence, saving logs to the specified LOG directory and outputs to the specified OUT directory.
+
+## 3. Command-Line Options
+
+The main script supports the following options (many correspond to the arrays and variables in run.sh):
+
+- `--data_files:` list of CSV files to process (mirrors FILE_NAMES entries in run.sh).
+- `--input_names:` space-separated input feature names (mirrors INPUT entries).
+- `--output_names:` target variable(s) for prediction (mirrors OUTPUT entries).
+- `--data_dir:` base directory for your datasets (mirrors DATA_DIRS).
+- `--log_dir:` directory where logs will be saved.
+- `--out_dir:` directory for output files (graphs, results, etc.).
+- `--living_time:` number of PSO iterations (how long each colony lives).
+- `--use_bp:` enable backpropagation for weight training (future versions may support a BP-free CANTS mode).
+- `--bp_epochs:` number of backpropagation epochs when --use_bp is set.
+- `--loss_fun:` loss function to optimize (default: mse for regression problems).
+- `--comm_interval:` iteration interval for colonies to exchange information via PSO.
+
+Example invocation:
+
+```bash
+python colonies.py \
+  --data_files file1.csv file2.csv \
+  --input_names AltAGL AltB ... \
+  --output_names E1_CHT1 \
+  --data_dir /path/to/datasets \
+  --log_dir logs \
+  --out_dir out \
+  --living_time 90 \
+  --use_bp \
+  --bp_epochs 10 \
+  --loss_fun mse \
+  --comm_interval 5
+```
+
+## 4. Parallel & Distributed Execution. Parallel & Distributed Execution
+
+For large-scale or multi-node setups, leverage MPI to run colonies in parallel:
+
+```bash
+mpirun -np <num_processes> python colonies.py [args]
+```
+
+
+An MPI process will work as the environment organizing the colonies PSO search. Each of the other MPI processes will run one colony, generating candidate graphs, which are trained and evaluated concurrently using Python threads.
 
 **Contact**  
 For questions, bug reports, or contributions, please reach out to:  
