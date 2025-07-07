@@ -61,6 +61,7 @@ class Colony():
                     num_itrs: int = 10,
                     worker_id: int = None,
                     out_dir: str = "./OUT",
+                    use_torch: bool = True,
     ):
 
         self.id = Colony.count + 1
@@ -78,6 +79,7 @@ class Colony():
         self.original_evaporation_rate = self.evaporation_rate  # Store the original evaporation rate
         self.population_size = population_size
         self.life_count = 0
+        self.__use_torch = use_torch
         self.space = Space(
                             input_names=input_names, 
                             output_names=output_names, 
@@ -153,7 +155,7 @@ class Colony():
                 paths.append(ant.path)
                 self.space.add_new_points(ant.new_points)
                 self.space.add_input_points(ant.new_in_points)
-        graph = Graph(ants_paths = paths, space=self.space, colony_id=self.id)
+        graph = Graph(ants_paths = paths, space=self.space, colony_id=self.id, use_torch=self.__use_torch)
         return graph
 
 

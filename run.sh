@@ -20,7 +20,7 @@ FILE_NAMES[wind]="turbine_R80721_2013-2016_1.csv"
 FILE_NAMES[c172]="c172_file_1.csv"
 FILE_NAMES[burner]="burner_0.csv"
 
-cpu=9                  # this will create 1 Enviroment Process & cpu-1 Colonies
+cpu=11                  # this will create 1 Enviroment Process & cpu-1 Colonies
 
 set=burner
 

@@ -1,13 +1,13 @@
 import numpy as np
 from search_space import Point
 from math import ceil, floor
-from util import function_dict, function_names
+from util import function_dict, function_names, d_function_dict
 import loguru
 import torch
 import random
 
 def sigmoid(x):
-    # x = max(-100.0, min(100.0, x))
+    x = max(-100.0, min(100.0, x))
     return 1 / (1 + np.exp(-x))
 
 logger = loguru.logger
@@ -31,6 +31,9 @@ class Edge():
         else:
             self.weight = 1.0
 
+    def get_weight(self):
+        return self.weight.item() if isinstance(self.weight, torch.Tensor) else self.weight[0]
+
 
 class Node():
     count = 0
@@ -39,7 +42,7 @@ class Node():
                     type=0, 
                     point: Point = None, 
                     lags=None,
-                    use_torch=True,
+                    use_torch=False,
     ):
         self.id = Node.count + 1
         self.__use_torch = use_torch
@@ -51,7 +54,7 @@ class Node():
         self.functions = {}
         self.backfire = 0.0
         self.forefire = []
-        self.d_err = None                  # Error value for output nodes only
+        self.d_node_value = None                  # Error value for output nodes only
         self.node_value = 0.0
         self.recieved_fire = 0
         self.recieved_backfire = 0
@@ -135,6 +138,7 @@ class Node():
                 fn_res = func(self.forefire)
             results.append(fn_res)
             self.node_value = torch.mean(torch.stack(results)) if self.__use_torch else np.mean(results)
+            self.d_node_value = d_function_dict[fn_id](self.node_value) if self.__use_torch else d_function_dict[fn_id](self.node_value)
             
         logger.debug(f"Node({self.id:5d}) is firing {self.node_value:.5f}")
 
@@ -142,7 +146,7 @@ class Node():
         for edge in self.outbound_edges.values():
             logger.debug(f"Edge ID({edge.id}) Node({edge.source.id})->Node({edge.target.id}) Weight({edge.weight})  ID:({id(edge.weight)})")
             node_value = self.node_value * edge.weight
-            node_value.retain_grad()
+            if self.__use_torch: node_value.retain_grad()
             edge.target.recieve_fire(node_value)
         self.recieved_fire = 0
         self.forefire = []
@@ -159,7 +163,7 @@ class Node():
             for edge in self.inbound_edges.values():
                 edge.source.update_weights()
                 edge.velocity = momentum * edge.velocity + (edge.weight.grad if self.__use_torch else edge.grad)
-                edge.weight -= torch.clamp(lr * edge.velocity, min=-10, max=10) if self.__use_torch else lr * edge.grad
+                edge.weight -= torch.clamp(lr * edge.velocity, min=-10, max=10) if self.__use_torch else lr * edge.velocity
                 edge.grad = 0.0
                 if self.__use_torch:
                     edge.weight.grad.zero_()
@@ -171,10 +175,13 @@ class Node():
             update_weights()
             
             
-    def fireback (self,):
+    def fireback (self, err=None):
+        if err is not None:
+            self.backfire = err
+            logger.debug(f"Node({self.id}) received backfire with error {err}")
         for edge in self.inbound_edges.values():
-            edge.source.recieve_backfire(self.backfire * self.node_value*(1-self.node_value) * edge.weight)
-            edge.grad+= self.backfire * edge.source.node_value * self.node_value * (1 - self.node_value)
+            edge.source.recieve_backfire(self.backfire * self.d_node_value * edge.weight)
+            edge.grad+= self.backfire * edge.source.node_value * self.d_node_value
             edge.grad = np.clip(edge.grad, -0.5, 0.5)
         self.recieved_backfire = 0
         self.backfire = 0.0

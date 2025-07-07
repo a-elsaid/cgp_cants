@@ -77,77 +77,57 @@ def dbscan(points, epsilon, min_pts):
 
 import torch
 # Functions
-def sin(x):
-    if type(x) == torch.Tensor:
-        return torch.sin(torch.sum(x))
-    return np.mean(list(map(np.sin, x)))
-def cos(x):
-    if type(x) == torch.Tensor:
-        return torch.cos(torch.sum(x))
-    return np.mean(list(map(np.cos, x)))
-def tan(x):
-    if type(x) == torch.Tensor:
-        return torch.tan(torch.sum(x))
-    return np.mean(list(map(np.tan, x)))
-def sigmoid(x):
-    if type(x) == torch.Tensor:
-        return torch.sigmoid(torch.sum(x))
-    def sig_fun(x):
-        x = np.float64(x)
-        return 1 / (1 + np.exp(-x))
-    return np.mean(list(map(sig_fun, x)))
+
+
 def relu(x):
     def relu_fun():
         return max(0, x)
     if type(x) == torch.Tensor:
         return torch.mean(torch.clamp(x, min=0))
     return np.mean(list(torch.max(0, x)))
+
 def leaky_relu(x):
     def leaky_relu_fun():
         return max(0.01*x, x)
     if type(x) == torch.Tensor:
         return torch.mean(torch.max(0.01*x, x))
     return np.mean(list(map(leaky_relu_fun, x)))
-def add(x):
-    if type(x) == torch.Tensor:
-        return torch.sum(x)
-    return np.sum(x)
-def multiply(x):
-    if type(x) == torch.Tensor:
-        return torch.prod(x)
-    return np.prod(x)
+
 def tanh(x):
     if type(x) == torch.Tensor:
         return torch.mean(torch.tanh(x))
     return np.tanh(np.mean(x))
-def inverse(x):
-    if type(x) == torch.Tensor:
-        return torch.mean(1/(x+1e-8))
-    return np.mean(1/x+1e-8)
+
 def negate(x):
     if type(x) == torch.Tensor:
         return torch.mean(x * -1)
     return np.mean(np.array(x) * -1)
+
 def maximum(x):
     if type(x) == torch.Tensor:
         return torch.max(x)
     return np.max(x)
+
 def minimum(x):
     if type(x) == torch.Tensor:
         return torch.min(x) 
     return np.min(x)
+
 def logic_and(x):
     if type(x) == torch.Tensor:
         return torch.sum(x > 0)
     return np.sum(np.array(x) > 0)
+
 def logic_or(x):
     if type(x) == torch.Tensor:
         return torch.sum(x > 0)
     return np.sum(np.array(x) > 0) > 0
+
 def exp(x):
     if type(x) == torch.Tensor:
         return torch.mean(torch.exp(x))
     return np.mean(np.exp(x))
+
 def log(x, base=np.e):
     if type(x) == torch.Tensor:
         y = torch.clip(x, 1e-10, None)
@@ -160,28 +140,34 @@ def log(x, base=np.e):
         return np.mean(np.log(x))  # Natural log
     else:
         return np.mean(np.log(x) / np.log(base))  # Log with custom base
+
 def sqrt(x):
     if type(x) == torch.Tensor:
         signs = torch.sign(x)
         return torch.mean(signs*torch.sqrt(torch.abs(x)))
     signs = np.sign(x)
     return np.mean(signs*np.sqrt(np.abs(x)))
+
 def square(x):
     if type(x) == torch.Tensor:
         return torch.mean(torch.square(torch.abs(x)))
     return np.mean(np.square(np.abs(x)))
+
 def cube(x):
     if type(x) == torch.Tensor:
         return torch.mean(torch.pow(x, 3))
     return np.mean(np.power(x, 3))
+
 def softmax(x):
     if type(x) == torch.Tensor:
         return torch.argmax(torch.exp(x)) / torch.sum(torch.exp(x))/len(x)
     return np.argmax(np.exp(x)) / np.sum(np.exp(x))/len(x)
+
 def cosh(x):
     if type(x) == torch.Tensor:
         return torch.mean(torch.cosh(x))
     return np.mean(np.cosh(x))
+
 def sinh(x):
     if type(x) == torch.Tensor:
         return torch.mean(torch.sinh(x))
@@ -192,27 +178,27 @@ def xor(x):
     if type(x) == torch.Tensor:
         return torch.mean(x) % 2
     return np.mean(x) % 2  # Returns 1 if the count of 1s is odd, 0 if even
+
 def xnor(x):
     # XNOR is the complement of XOR, true if an even number of inputs are true
     return 1 - xor(x)  # Returns 1 if XOR result is 0, 0 if XOR result is 1
+
 def ispositive(x):
     if type(x) == torch.Tensor:
         return torch.sum(x > 0) > 0
     return np.sum(np.array(x) > 0) > 0
+
 def isnegative(x):
     if type(x) == torch.Tensor:
         return torch.sum(x < 0) < 0
     return np.sum(np.array(x) < 0) < 0
+
 def iszero(x):
     if type(x) == torch.Tensor:
         s = torch.sum(x)
         return s>-0.05 and s<0.05
     s = np.sum(x)
     return s>-0.05 and s<0.05
-def mean(x):
-    if type(x) == torch.Tensor:
-        return torch.mean(x)
-    return np.mean(x)
 
 '''    
 function_dict = {
@@ -279,6 +265,96 @@ function_names = {
                 }
 '''
 
+
+
+def add(x):
+    if type(x) == torch.Tensor:
+        return torch.sum(x)
+    return np.sum(x)
+
+def multiply(x):
+    if type(x) == torch.Tensor:
+        return torch.prod(x)
+    return np.prod(x)
+
+def sin(x):
+    if type(x) == torch.Tensor:
+        return torch.sin(torch.sum(x))
+    return np.mean(list(map(np.sin, x)))
+
+def cos(x):
+    if type(x) == torch.Tensor:
+        return torch.cos(torch.sum(x))
+    return np.mean(list(map(np.cos, x)))
+
+def tan(x):
+    if type(x) == torch.Tensor:
+        return torch.tan(torch.sum(x))
+    return np.mean(list(map(np.tan, x)))
+
+def sigmoid(x):
+    if type(x) == torch.Tensor:
+        return torch.sigmoid(torch.sum(x))
+    def sig_fun(x):
+        x = np.float64(x)
+        return 1 / (1e-9 + 1 + np.exp(-x))
+    return np.mean(list(map(sig_fun, x)))
+
+def inverse(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(1/(x+1e-8))
+    x = np.array(x)
+    return np.mean(1/(x+1e-8))
+
+def mean(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(x)
+    x = np.array(x)
+    return np.mean(x)
+
+
+def d_add(x):
+    if type(x) == torch.Tensor:
+        return torch.tensor(1.0, dtype=torch.float64)
+    return 1.0
+
+def d_multiply(x):
+    if type(x) == torch.Tensor:
+        return torch.tensor(1.0, dtype=torch.float64)
+    return 1.0
+
+def d_sin(x):
+    if type(x) == torch.Tensor:
+        return torch.cos(x)
+    return np.cos(x)
+
+def d_cos(x):
+    if type(x) == torch.Tensor:
+        return torch.sin(x) * -1
+    return np.cos(x) * -1
+
+def d_tan(x):
+    if type(x) == torch.Tensor:
+        return 1/(torch.cos(x))**2
+    return 1/((np.cos(x))**2+1e-9)
+
+def d_tanh(x):
+    if type(x) == torch.Tensor:
+        return 1 - (torch.tanh(x))**2
+    return 1 - (np.tanh(x))**2
+
+def d_sigmoid(x):
+    return x/(1-x+1e-9)
+
+def d_inverse(x):
+    return -1/(x+1e-9)**2
+
+def d_mean(x):
+    if type(x) == torch.Tensor:
+        return torch.mean(x)
+    x = np.array(x)
+    return np.mean(x)
+
 function_dict = {
                     0: add, 
                     1: multiply, 
@@ -290,6 +366,19 @@ function_dict = {
                     7: inverse,
                     8: mean,
                 }
+
+d_function_dict = {
+                    0: d_add, 
+                    1: d_multiply, 
+                    2: d_sin, 
+                    3: d_cos,
+                    4: d_tan,
+                    5: d_sigmoid,
+                    6: d_tanh,
+                    7: d_inverse,
+                    8: d_mean,
+                }
+
 function_names = {
                     0: 'add', 
                     1: 'multiply', 

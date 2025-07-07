@@ -13,6 +13,9 @@ from util import function_names
 import ipdb
 
 def sigmoid(x):
+    if type(x) == torch.Tensor:
+        return torch.sigmoid(x)
+    x = np.clip(x, -500, 500)  # Avoid overflow
     return 1 / (1 + np.exp(-x))
 def softmax(x):
     e_x = np.exp(x - np.max(x))
@@ -31,7 +34,7 @@ class Graph:
                     lags=5,
                     space=None,
                     colony_id=None,
-                    use_torch=True,
+                    use_torch=False,
     ):
         self.id = Graph.count 
         self.__use_torch = use_torch
@@ -81,7 +84,7 @@ class Graph:
                 # Check if the node already exists
                 curr_node = nodes_of_input_points.get(
                                                     curr_point.name, 
-                                                    Node(type=curr_point.get_node_type(), point=curr_point, lags=self.lags)
+                                                    Node(type=curr_point.get_node_type(), point=curr_point, lags=self.lags, use_torch=self.__use_torch)
                                                     )  
                 nodes_of_input_points[curr_point.name] = curr_node
             
@@ -91,14 +94,14 @@ class Graph:
                 # Check if the node already exists
                 next_node = nodes_of_output_points.get(
                                                     next_point.get_id(), 
-                                                    Node(type=next_point.get_node_type(), point=next_point, lags=self.lags)
+                                                    Node(type=next_point.get_node_type(), point=next_point, lags=self.lags, use_torch=self.__use_torch)
                                                     )
                 nodes_of_output_points[next_point.get_id()] = next_node
             elif next_point.get_node_type() == 0:
                 # Check if the node already exists
                 next_node = nodes.get(
                                                     next_point.get_id(), 
-                                                    Node(type=next_point.get_node_type(), point=next_point, lags=self.lags)
+                                                    Node(type=next_point.get_node_type(), point=next_point, lags=self.lags, use_torch=self.__use_torch)
                                     )
                 nodes[next_point.get_id()] = next_node   # Add All node
             else:
@@ -171,7 +174,7 @@ class Graph:
             new_cluster_point = Point(*center_of_mass_point, type=0)
             # self.space.points.append(new_cluster_point)   # Adding new points in the colony to decouple the graph from the colony
             self.added_points.append(new_cluster_point)
-            new_cluster_node = Node(point=new_cluster_point, lags=self.lags)
+            new_cluster_node = Node(point=new_cluster_point, lags=self.lags, use_torch=self.__use_torch)
             logger.debug(f"\tNew cluster Point({new_cluster_point.get_id()}) - Node({new_cluster_node.id})")
             new_nodes.append(new_cluster_node)
 
@@ -329,7 +332,7 @@ class Graph:
                     new_input_lag_point.name = self.space.input_names[input_index]
                     new_input_lag_point.name_idx = input_index
                     logger.trace(f"LAG NODE: Adding node: Node({new_input_lag_point.get_id()})")
-                    new_input_lag_node = Node(point=new_input_lag_point, type=1, lags=self.lags)
+                    new_input_lag_node = Node(point=new_input_lag_point, type=1, lags=self.lags, use_torch=self.__use_torch)
                     new_input_lag_node.add_edge(node)
                     # self.space.input_points.append(new_input_lag_point)   #adding new points in colony to decouple the graph from the colony
                     self.added_in_points.append(new_input_lag_point)
@@ -400,7 +403,6 @@ class Graph:
 
         logger.trace(f"Bicross Entropy: {bce} -- Derivative: {d_bce}")
         return bce, d_bce
-    
 
     def cross_entropy(self, y_true, y_pred, prt=False):
         """
@@ -475,7 +477,6 @@ class Graph:
                     node.d_err = e
                 if cal_gradient:
                     self.feed_backward(err)
-            # self.feed_backward(torch.stack(errors))
             return preds, errors, d_errors
 
     def evaluate(self, data, cal_gradient=True, cost_type="mse", num_epochs=1, thread_id=None):
@@ -489,14 +490,25 @@ class Graph:
         thd = f" Thread({thread_id})" if thread_id is not None else " "
             
         for epoch in range(1,num_epochs+1):
-            preds, errors, d_errors = self.single_thrust(input, target, prt=False, cal_gradient=cal_gradient, cost_type=cost_type)
-                    
+            time_start = time()
+            preds, errors, d_errors = self.single_thrust(
+                                                            input, 
+                                                            target, 
+                                                            prt=False, 
+                                                            cal_gradient=cal_gradient, 
+                                                            cost_type=cost_type,
+                                                        )
+
             train_errors = torch.stack(errors) if self.__use_torch else np.array(errors)
             train_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
             train_preds = torch.stack(preds) if self.__use_torch else np.array(preds)
+            
+            mean_train_err = torch.mean(train_errors) if self.__use_torch else np.mean(train_errors)
             if num_epochs>1: 
-                logger.info(f"\tColony({self.colony_id:3d}){thd}:: Epoch: {(epoch):3d}/{num_epochs} Epoch MSE: {torch.mean(train_errors):.6e}")
-                if torch.mean(train_errors) > 10:
+                logger.info(f"\tColony({self.colony_id:3d}){thd}:: " + 
+                            f"Epoch: {(epoch):3d}/{num_epochs} " + 
+                            f"Epoch MSE: {mean_train_err}")
+                if mean_train_err > 10:
                     break
 
         if self.__use_torch:
@@ -512,8 +524,12 @@ class Graph:
         # test_d_errors = torch.stack(d_errors) if self.__use_torch else np.array(d_errors)
         # test_preds    = torch.stack(preds) if self.__use_torch else np.array(preds)
         
-        logger.info(f"Colony({self.colony_id}){thd}:: Training MSE: {torch.mean(train_errors):.6e}, TEST MSE: {torch.mean(test_errors):.6e}")
-        
+        mean_train_err = torch.mean(train_errors) if self.__use_torch else np.mean(train_errors)
+        mean_test_err = torch.mean(test_errors) if self.__use_torch else np.mean(test_errors)
+        logger.info(f"Colony({self.colony_id}){thd}:: " + 
+                    f"Training MSE: {mean_train_err:.6e}, " +
+                    f"TEST MSE: {mean_test_err:.6e}")
+
         if self.__use_torch:
             return torch.mean(test_errors).detach().numpy(), d_errors
         else:
@@ -526,11 +542,18 @@ class Graph:
     def feed_backward(self,err):
         if self.__use_torch:
             torch.mean(err).backward()
+        else:   
+            for node in self.out_nodes:
+                node.fireback(err)
+        
         for node in self.out_nodes:
             node.update_weights(lr=0.01)
 
     def get_output(self):
-        return torch.stack([node.node_value for node in self.out_nodes])
+        if self.__use_torch:
+            return torch.stack([node.node_value for node in self.out_nodes])
+        else:
+            return np.array([node.node_value for node in self.out_nodes])
 
 
     def plot_target_predict(self, data, file_name:str="", cost_type="mse")->None:
@@ -616,7 +639,7 @@ class Graph:
         eqn = ""
         for node in self.out_nodes:
             for edge in node.inbound_edges.values():
-                eqn += f"{edge.source.get_eqn()} * {edge.weight:.4f} + "
+                eqn += f"{edge.source.get_eqn()} * {edge.weight[0]:.4f} + "
             eqn = f"[{eqn[:-3]}] / {len(node.inbound_edges)}\n"
         if filename is not None:
             with open(filename, "w") as f:
