@@ -33,13 +33,13 @@ for i in {1..9}; do
     --output_names ${OUTPUT[$set]} \
     --log_dir LOG\
     --out_dir OUT\
-    --living_time 30  \
+    --living_time 90  \
     --term_log_level INFO \
     --log_file_name cants_trial_$f_name_$i \
     --file_log_level INFO \
     --col_log_level INFO -nrm minmax \
     --use_bp --bp_epochs 9 \
     --loss_fun mse \
-    --comm_interval 9
+    --comm_interval 5
     exit
 done
