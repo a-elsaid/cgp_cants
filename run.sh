@@ -20,7 +20,7 @@ FILE_NAMES[wind]="turbine_R80721_2013-2016_1.csv"
 FILE_NAMES[c172]="c172_file_1.csv"
 FILE_NAMES[burner]="burner_0.csv"
 
-cpu=9                  # this will create 1 Enviroment Process & cpu-1 Colonies
+cpu=2                  # this will create 1 Enviroment Process & cpu-1 Colonies
 
 set=burner
 
@@ -33,13 +33,13 @@ for i in {1..9}; do
     --output_names ${OUTPUT[$set]} \
     --log_dir LOG\
     --out_dir OUT\
-    --living_time 90  \
+    --living_time 30  \
     --term_log_level INFO \
     --log_file_name cants_trial_$f_name_$i \
     --file_log_level INFO \
     --col_log_level INFO -nrm minmax \
     --use_bp --bp_epochs 9 \
     --loss_fun mse \
-    --comm_interval 5
+    --comm_interval 1
     exit
 done
