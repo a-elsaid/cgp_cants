@@ -20,7 +20,7 @@ FILE_NAMES[wind]="turbine_R80721_2013-2016_1.csv"
 FILE_NAMES[c172]="c172_file_1.csv"
 FILE_NAMES[burner]="burner_0.csv"
 
-cpu=2                  # this will create 1 Enviroment Process & cpu-1 Colonies
+cpu=11                  # this will create 1 Enviroment Process & cpu-1 Colonies
 
 set=burner
 
@@ -40,6 +40,6 @@ for i in {1..9}; do
     --col_log_level INFO -nrm minmax \
     --use_bp --bp_epochs 9 \
     --loss_fun mse \
-    --comm_interval 1
+    --comm_interval 9
     exit
 done
