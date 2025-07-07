@@ -34,7 +34,7 @@ Based on the soon-to-be-published journal article “CANTS-GP: A Nature-Inspired
         - macOS: brew install open-mpi
 - **Python Packages**:  
   ```bash
-  pip install numpy pandas scikit-learn torch graphviz loguru matplotlib
+  pip install numpy pandas scikit-learn torch graphviz loguru matplotlib mpi4py ipdb
   ```
   
 
