@@ -193,7 +193,7 @@ class Node():
             self.fireback()
 
     def adjust_lag(self, lags):
-        self.lag = round(self.point.get_z() * lags)
+        segslf.lag = round(self.point.get_z() * lags)
         self.z = self.lag / max(1,lags)
 
 
@@ -216,3 +216,23 @@ class Node():
             eqn = f"{node_funs[0]}{eqn}"
 
         return eqn
+
+    def get_eqn_foactored(self, visited_nodes, max_lag):
+        if self.id in visited_nodes or self.type==1: return ""
+        visited_nodes.append(self.id)
+        self_name = f"N{self.id}"
+        if self.type==2: self_name = self.point.name
+        eqn=f"{self_name} = {function_names[list(self.functions.keys())[0]]}("
+        for edge in self.inbound_edges.values():
+            if edge.source.type==1:
+                node_name = edge.source.point.name + f"_{max_lag - self.lag}"
+            else:
+                node_name = f"N{edge.source.id}"
+            eqn+=f"{edge.weight:.2f}*{node_name}, "
+        eqn= eqn[:-2] + ")"
+        if eqn!="": eqn+='\n'
+        for edge in self.inbound_edges.values():
+            eqn+= edge.source.get_eqn_foactored(visited_nodes, max_lag)
+         
+        return eqn
+        

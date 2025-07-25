@@ -10,22 +10,22 @@ f_name="gp-cants"
 activation="tanh"
 
 declare -A DATA_DIRS
-declare -A INPUT
-declare -A OUTPUT
+declare -A INPUTS
+declare -A OUTPUTS
 declare -A FILE_NAMES
 
-DATA_DIRS[wind]="$data_dir/2020_wind_engine"
+DATA_DIRS[wind]="$data_dir/2020_engie_wind"
 DATA_DIRS[c172]="$data_dir/2019_ngafid_transfer"
 DATA_DIRS[burner]="$data_dir/2018_coal"
 
 
-INPUT[wind]="Ba_avg Rt_avg DCs_avg Cm_avg S_avg Cosphi_avg Db1t_avg Db2t_avg Dst_avg Gb1t_avg Gb2t_avg Git_avg Gost_avg Ya_avg Yt_avg Ws_avg Wa_avg Ot_avg Nf_avg Nu_avg Rbt_avg P_avg"
-INPUT[burner]="Conditioner_Inlet_Temp Conditioner_Outlet_Temp Coal_Feeder_Rate Primary_Air_Flow Primary_Air_Split System_Secondary_Air_Flow_Total Secondary_Air_Flow Secondary_Air_Split Tertiary_Air_Split Total_Comb_Air_Flow Supp_Fuel_Flow Main_Flm_Int"
-INPUT[c172]="AltAGL AltB AltGPS AltMSL BaroA E1_CHT2 E1_CHT3 E1_CHT4 E1_EGT1 E1_EGT2 E1_EGT3 E1_EGT4 E1_FFlow E1_OilP E1_OilT E1_RPM FQtyL FQtyR GndSpd IAS LatAc NormAc OAT Pitch Roll TAS VSpd VSpdG WndDr WndSpd E1_CHT1"
+INPUTS[wind]="Ba_avg Rt_avg DCs_avg Cm_avg S_avg Cosphi_avg Db1t_avg Db2t_avg Dst_avg Gb1t_avg Gb2t_avg Git_avg Gost_avg Ya_avg Yt_avg Ws_avg Wa_avg Ot_avg Nf_avg Nu_avg Rbt_avg P_avg"
+INPUTS[burner]="Conditioner_Inlet_Temp Conditioner_Outlet_Temp Coal_Feeder_Rate Primary_Air_Flow Primary_Air_Split System_Secondary_Air_Flow_Total Secondary_Air_Flow Secondary_Air_Split Tertiary_Air_Split Total_Comb_Air_Flow Supp_Fuel_Flow Main_Flm_Int"
+INPUTS[c172]="AltAGL AltB AltGPS AltMSL BaroA E1_CHT2 E1_CHT3 E1_CHT4 E1_EGT1 E1_EGT2 E1_EGT3 E1_EGT4 E1_FFlow E1_OilP E1_OilT E1_RPM FQtyL FQtyR GndSpd IAS LatAc NormAc OAT Pitch Roll TAS VSpd VSpdG WndDr WndSpd E1_CHT1"
 
-OUTPUT[c172]="Pitch"
-OUTPUT[burner]="Supp_Fuel_Flow"
-OUTPUTS[wind]="P_avg"
+OUTPUTS[c172]="Pitch"
+OUTPUTS[burner]="Supp_Fuel_Flow"
+OUTPUTS[wind]="Cm_avg"
 
 FILE_NAMES[wind]="turbine_R80721_2013-2016_1.csv"
 FILE_NAMES[c172]="c172_file_1.csv"
@@ -33,15 +33,15 @@ FILE_NAMES[burner]="burner_0.csv"
 
 cpu=11                  # this will create 1 Enviroment Process & cpu-1 Colonies
 
-set=burner
+set=wind
 
 for i in {1..9}; do
     echo "Starting CANTS Experiment: " $i
     time mpirun -n $cpu --oversubscribe python3 ./src/colonies.py \
     --data_dir ${DATA_DIRS[$set]} \
     --data_files ${FILE_NAMES[$set]} \
-    --input_names ${INPUT[$set]} \
-    --output_names ${OUTPUT[$set]} \
+    --input_names ${INPUTS[$set]} \
+    --output_names ${OUTPUTS[$set]} \
     --log_dir LOG\
     --out_dir OUT\
     --living_time 90  \
@@ -51,6 +51,6 @@ for i in {1..9}; do
     --col_log_level INFO -nrm minmax \
     --use_bp --bp_epochs 9 \
     --loss_fun mse \
-    --comm_interval 5
+    --comm_interval 2
     exit
 done
