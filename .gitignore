@@ -4,6 +4,7 @@
 *.png
 *.pdf
 *.gv
+*.ipynb
 colony_*
 LOG*
 OUT*

@@ -607,26 +607,43 @@ class Graph:
     """
     def visualize_graph(self, filename=None,):
         dot = gv.Digraph(comment='Graph Visualization')
+        dot.attr(rankdir='TB')
         
         # Add nodes
+        in_nodes = []
         for node in self.nodes.values():
             if node.type == 0:
                 # dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()})")
                 dot.node(str(node.id), label=f"{function_names[list(node.functions.keys())[0]]}")
             elif node.type==1:
-                dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()}) {node.point.name}", shape='box', style='filled', fillcolor='lightblue')
+                if node.point.name not in in_nodes:
+                    in_nodes.append(node.point.name)
+                    dot.node(str(node.point.name), label=f"N({node.id}) - p({node.point.get_id()}) {node.point.name}", shape='box', style='filled', fillcolor='lightblue', rank ='min', group='inputs', weight="0.5")
             elif node.type==2:
-                dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()}) {node.point.name}", shape='box', style='filled', fillcolor='lightgrey')
+                dot.node(str(node.id), label=f"N({node.id}) - p({node.point.get_id()}) {node.point.name}", shape='box', style='filled', fillcolor='lightgrey', rank='max')
             else:
                 print(f"Visualization: Unknown node type: Node({node.id} Type: {node.type})")
                 exit(1)
+        with dot.subgraph(name='cluster_same_rank') as s:
+            s.attr(rank='min', style="invis")
+            for node in self.in_nodes:
+                s.node(node.point.name)
+           
+
         
         
         # Add edges
         for node in self.nodes.values():
             for edge in node.outbound_edges.values():
-                dot.edge(str(node.id), str(edge.target.id), style='solid', color='green')
+                s = "solid"
+                if  node.lag!=self.lags:
+                    s = "dashed"
+                if node.type==1:
+                    dot.edge(str(node.point.name), str(edge.target.id), style=s, color='orange')
+                else:
+                    dot.edge(str(node.id), str(edge.target.id), style='solid', color='orange')
 
+            continue
             for edge in node.inbound_edges.values():
                 dot.edge(str(node.id), str(edge.source.id), style='dotted', color='red', arrowhead='none')
         
@@ -639,11 +656,17 @@ class Graph:
         eqn = ""
         for node in self.out_nodes:
             for edge in node.inbound_edges.values():
-                eqn += f"{edge.source.get_eqn()} * {edge.weight[0]:.4f} + "
+                eqn += f"{edge.source.get_eqn()} * {edge.get_weight():.4f} + "
             eqn = f"[{eqn[:-3]}] / {len(node.inbound_edges)}\n"
         if filename is not None:
             with open(filename, "w") as f:
                 f.write(eqn)
+        return eqn
+
+    def generate_eqn_from_inputs(self, file_name=None,):
+        eqn=""
+        for node in self.out_nodes:
+            eqn+= node.get_eqn_foactored([], self.lags)
         return eqn
 
     def write_structure(self, file_name=None):
