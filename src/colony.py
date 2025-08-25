@@ -12,7 +12,6 @@ from typing import List
 
 import multiprocessing as mp
 
-
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 import threading
 
@@ -530,3 +529,34 @@ class Colony():
     def load_graph(self, name):
         with open(name, "rb") as f:
             return pickle.load(f)
+
+    # === Added: expose best graph/model directly from Colony ===
+    def get_best_graph(self):
+        """Return the current best Graph (lowest fitness) or None if empty."""
+        if not self.best_solutions:
+            return None
+        try:
+            self.best_solutions.sort(key=lambda x: x[0])  # lower fitness is better
+        except Exception:
+            pass
+        try:
+            return self.best_solutions[0][1]
+        except Exception:
+            return None
+
+    def get_best_model(self):
+        """Alias for get_best_graph(), for downstream code that expects 'model'."""
+        return self.get_best_graph()
+
+    def get_best_fitness(self):
+        """Return the best (lowest) fitness value or None if unknown."""
+        if not self.best_solutions:
+            return None
+        try:
+            self.best_solutions.sort(key=lambda x: x[0])
+        except Exception:
+            pass
+        try:
+            return float(self.best_solutions[0][0])
+        except Exception:
+            return None

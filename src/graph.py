@@ -17,6 +17,7 @@ def sigmoid(x):
         return torch.sigmoid(x)
     x = np.clip(x, -500, 500)  # Avoid overflow
     return 1 / (1 + np.exp(-x))
+
 def softmax(x):
     e_x = np.exp(x - np.max(x))
     return e_x / e_x.sum(axis=0) if x.ndim == 1 else e_x / e_x.sum(axis=1, keepdims=True)
@@ -108,10 +109,6 @@ class Graph:
                 print(f"Unknown node type or Input node: {next_point.get_node_type()}")
                 exit(1)
             
-            # print(f"Point({curr_point.get_id()}) Node({curr_node.id}) ->", end=' ')
-
-            
-
             curr_node.add_edge(next_node)                        # adding edge between nodes   
             return next_node
 
@@ -125,14 +122,10 @@ class Graph:
                                             next_point=path[i+1], 
                                             curr_node=next_node,
                                         )
-            # print(f"Point({path[-1].get_id()}) Node({next_node.id})")
-            # print()
             
         self.nodes = {node.id:node for node in {**nodes_of_input_points, **nodes, **nodes_of_output_points}.values()}
         self.in_nodes = list(nodes_of_input_points.values())
         self.out_nodes = list(nodes_of_output_points.values())
-
-
 
     def remove_node(self, node_id):
         # Remove node & all its references from the graph
@@ -149,7 +142,6 @@ class Graph:
         # Remove edge from the graph
         del self.nodes[source_id].outbound_edges[target_id]
         del self.nodes[target_id].inbound_edges[source_id]
-
 
     def merge_nodes(self,):
         # Merge nodes in the same cluster
@@ -207,7 +199,6 @@ class Graph:
             del self.nodes[node_id]
         for node in new_nodes:
             self.nodes[node.id] = node
-
 
     def detect_and_remove_cycles(self,):
         visited = set() # Nodes that have been visited
@@ -308,7 +299,6 @@ class Graph:
         self.detect_and_remove_cycles() # Detect and remove cycles
         self.remove_dead_ends()         # Remove dead ends
 
-
     def add_lagged_inputs(self,):
         added_points = []
         added_nodes = []
@@ -343,27 +333,20 @@ class Graph:
                     logger.trace(f"LAG EDGE: Adding edge between Node({in_node.id}) and Node({node.id}), Type: {in_node.type}")
                     in_node.add_edge(node)
 
-                    
-
             edges = list(node.outbound_edges.values())
             for edge in edges:
                 thrust_forward(edge.target, node, in_node)
 
-        
         #iterate over input nodes to start there and reach output nodes
         for in_node in self.in_nodes:
             edges = list(in_node.outbound_edges.values())
             for edge in edges:
                 thrust_forward(edge.target, in_node, in_node)
 
-        # for point in added_points:
-        #     self.space.points.append(point) #adding new points in colony to decouple the graph from the colony
         for node in added_nodes:
             self.nodes[node.id] = node
             self.in_nodes.append(node)
     
-
-
     def mse(self, y_true, y_pred, prt=False):
         # mse = np.array(y_true) - np.array(y_pred)
         err = y_true - y_pred
@@ -438,6 +421,81 @@ class Graph:
         logger.trace(f"Cross Entropy: {ce} -- Derivative: {d_ce}")
         return ce, d_ce
 
+    # ==================== NEW: Accuracy helpers ====================
+    def accuracy_one_hot(self, y_true, y_pred, prt=False):
+        """
+        Compare argmax(class) for one-hot y_true vs. model output y_pred.
+        y_true: one-hot vector [1,0] or [0,1] (torch or numpy)
+        y_pred: raw/logit vector OR probabilities. We internally apply softmax if needed.
+        Returns 1.0 if match else 0.0
+        """
+        # Convert to numpy
+        if isinstance(y_true, torch.Tensor):
+            y_true = y_true.detach().cpu().numpy()
+        if isinstance(y_pred, torch.Tensor):
+            y_pred = y_pred.detach().cpu().numpy()
+
+        # If y_pred isn't a probability distribution, softmax it for safety
+        if y_pred.ndim == 0:
+            # scalar edge-case: treat >0.5 as class 1, else class 0
+            pred_cls = int(y_pred >= 0.5)
+            true_cls = int(np.argmax(np.atleast_1d(y_true)))
+        else:
+            probs = softmax(y_pred) if y_pred.ndim == 1 else y_pred
+            pred_cls = int(np.argmax(probs))
+            true_cls = int(np.argmax(y_true))
+
+        match = 1.0 if pred_cls == true_cls else 0.0
+        if prt:
+            print(f"[ACC] pred_cls={pred_cls}, true_cls={true_cls}, match={int(match)}")
+        return match
+
+    def compute_accuracy(self, data, cost_type="cross_entropy", on="test", prt=False):
+        """
+        Compute accuracy (%) over a dataset split using one-hot targets.
+        - data: Timeseries-like with .train_input/.train_output/.test_input/.test_output
+        - cost_type controls the activation used in single_thrust.
+        - on: 'train' or 'test'
+        """
+        if on not in ("train", "test"):
+            raise ValueError("on must be 'train' or 'test'")
+
+        if on == "train":
+            if self.__use_torch:
+                inputs = torch.tensor(data.train_input, dtype=torch.float32)
+                targets = torch.tensor(data.train_output, dtype=torch.float32)
+            else:
+                inputs = data.train_input
+                targets = data.train_output
+        else:
+            if self.__use_torch:
+                inputs = torch.tensor(data.test_input, dtype=torch.float32)
+                targets = torch.tensor(data.test_output, dtype=torch.float32)
+            else:
+                inputs = data.test_input
+                targets = data.test_output
+
+        # Run forward (no gradient) to get outputs per time step
+        preds, _, _ = self.single_thrust(inputs, targets, prt=False, cal_gradient=False, cost_type=cost_type)
+
+        # Align targets with lags
+        if isinstance(targets, torch.Tensor):
+            y_seq = targets[self.lags:]
+        else:
+            y_seq = targets[self.lags:]
+
+        total = 0
+        correct = 0
+        for i, out in enumerate(preds):
+            y_true_i = y_seq[i]
+            correct += int(self.accuracy_one_hot(y_true_i, out, prt=prt))
+            total += 1
+
+        acc = 0.0 if total == 0 else (100.0 * correct / total)
+        if prt:
+            print(f"[ACC] total={total}, correct={correct}, accuracy={acc:.2f}%")
+        return acc
+    # ================== END: Accuracy helpers ======================
 
     def single_thrust(self, input, target, prt=False, cal_gradient=True, cost_type="mse"):
             preds, errors, d_errors = [], [], []
@@ -555,7 +613,6 @@ class Graph:
         else:
             return np.array([node.node_value for node in self.out_nodes])
 
-
     def plot_target_predict(self, data, file_name:str="", cost_type="mse")->None:
         
         if self.__use_torch:
@@ -577,8 +634,6 @@ class Graph:
         target = target.detach().numpy()[self.lags:]
         array = np.column_stack((preds, target))
         
-
-
         np.savetxt(file_name+".txt", array, fmt="%f", header="Predicted,Target", comments="", delimiter=",")
 
         if file_name=="":
@@ -594,14 +649,6 @@ class Graph:
         plt.clf()
         plt.close()
 
-   
-
-
-
-
-
-
-    
     """ 
     ************************************ Visualization *************************************** 
     """
@@ -628,9 +675,6 @@ class Graph:
             s.attr(rank='min', style="invis")
             for node in self.in_nodes:
                 s.node(node.point.name)
-           
-
-        
         
         # Add edges
         for node in self.nodes.values():
@@ -694,7 +738,6 @@ class Graph:
                 f.write(structure)
         return structure
 
-
     def plot_path_points(self, ax=None, size=40, save_here=False, show=False, plt=None):
         if ax is None:
             import matplotlib.pyplot as plt
@@ -727,7 +770,6 @@ class Graph:
             plt.cla()
             plt.clf()
             plt.close('all')
-
 
     def plot_nodes(self, ax=None, size=400, save_here=False, show=False, plt=None):
         if ax is None:
@@ -781,8 +823,6 @@ class Graph:
                                 point.get_x(), 
                                 point.get_y(), 
                                 point.get_z(), 
-                                # c=point.get_f(), 
-                                # cmap='viridis', 
                                 color=color,
                                 s=point.get_pheromone()*100, 
                                 alpha=0.35, 
@@ -812,11 +852,7 @@ class Graph:
             ax.text(xs[0], ys[0], zs[0], f"{points[0].name}", color=colors[i], fontsize=50)
             
             ax.scatter(xs, ys, zs, c=fs, cmap='viridis', marker='o', s=size)
-            # ax.plot(xs, ys, zs, color=colors[i])
              
-            # self.draw_cone(ax=ax, start=[xs[0], ys[0], zs[0]], direction=[xs[-1]-xs[0], ys[-1]-ys[0], zs[-1]-zs[0]], color=colors[i])
-
-
             for j in range(len(xs) - 1):
                 ax.quiver(
                             xs[j], ys[j], zs[j], 
@@ -836,6 +872,3 @@ class Graph:
             plt.clf()
             plt.close('all')
         # ipdb.set_trace()
-
-
-    
