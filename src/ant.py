@@ -3,9 +3,10 @@ import numpy as np
 from util import get_center_of_mass
 import loguru
 import sys
-logger = loguru.logger
 
+logger = loguru.logger
 logger.add(sys.stdout, level="INFO")
+
 
 class Ant():
     def __init__(self, space: Space):
@@ -19,66 +20,67 @@ class Ant():
         self.mutation_sigma = 0.15
         self.space = space
         self.path = []
-        self.best_behaviors = [] # [[RNN_performance, explore_rate, sense_range]]
+        self.best_behaviors = []  # [[RNN_performance, explore_rate, sense_range]]
         self.new_points = []
-        self.new_in_points = [] 
+        self.new_in_points = []
 
     def update_position(self, point):
         self.x = point.get_x()
         self.y = point.get_y()
         self.z = point.get_z()
         self.f = point.get_f()
-    
+
     def add_point_to_space(self, new_point):
         if new_point.get_node_type() == 0:
             self.new_points.append(new_point)
         elif new_point.get_node_type() == 1:
             self.new_in_points.append(new_point)
-        else:  
-            logger.error(f"Unexpeted Type For Creating New Point: {new_point.get_node_type()}")
+        else:
+            logger.error(f"Unexpected Type For Creating New Point: {new_point.get_node_type()}")
             exit(1)
         self.update_position(new_point)
 
     def create_new_point(self, type):
         logger.debug(f"Creating new point (Type: {type})...")
-        
+
         def create_coordinates(coord, lower_bound=0):
-            if type==0:
+            if type == 0:
                 return np.random.uniform(
-                                            max(0, coord - lower_bound), 
-                                            min(coord + self.sense_range, 1)
-                                        )
-            elif type==1:
+                    max(0, coord - lower_bound),
+                    min(coord + self.sense_range, 1)
+                )
+            elif type == 1:
                 return np.random.uniform(0, 1)
+
         # Create a new point based on the current position and pheromone levels
         lower_bound = self.sense_range
         x = create_coordinates(self.x, lower_bound=lower_bound)
         z = create_coordinates(self.z, lower_bound=lower_bound)
         f = create_coordinates(self.f, lower_bound=lower_bound)
-        if type==0:
-            if z<=self.z:
+        if type == 0:
+            if z <= self.z:
                 lower_bound = 0
             y = create_coordinates(self.y, lower_bound=lower_bound)
-            if y>=0.98:
+            if y >= 0.98:
                 return self.pick_output()
-        elif type==1:
-             y = 0
+        elif type == 1:
+            y = 0
         else:
-            logger.error(f"Unexpeted Type For Creating New Point: {type}")
+            logger.error(f"Unexpected Type For Creating New Point: {type}")
             exit(1)
 
         logger.trace(f"Creating Point: x={x}, y={y}, z={z}, f={f}, Type={type}")
-        new_point =  Point( x, y, z, f, type=type)
-        
+        new_point = Point(x, y, z, f, type=type)
+
         self.add_point_to_space(new_point)
         return new_point
 
     def opposite_to_pheromone_center(self, pheromone_center, type):
-        if np.random.uniform() < self.explore_rate: # Explore Randomly
+        if np.random.uniform() < self.explore_rate:  # Explore Randomly
             return self.create_new_point(type)
         '''
         Create a new point opposite to the center of mass of pheromones
-        to explit the search space
+        to exploit the search space
         '''
         logger.debug(f"Creating Point Opposite to Center of Mass (Type: {type})...")
         def create_coordinates(coord, cm):
@@ -86,32 +88,30 @@ class Ant():
             opposite_cm = max(0, min(opposite_cm, 1))
             return opposite_cm
 
-        lower_bound = self.sense_range
         x_ocfm = create_coordinates(self.x, pheromone_center[0])
         z_ocfm = create_coordinates(self.z, pheromone_center[2])
         f_ocfm = create_coordinates(self.f, pheromone_center[3])
-        if type==0:
+        if type == 0:
             y_ocfm = create_coordinates(self.y, pheromone_center[1])
             y_ocfm = max(y_ocfm, self.y)
-            if y_ocfm>=0.98:
+            if y_ocfm >= 0.98:
                 return self.pick_output()
-        elif type==1:
+        elif type == 1:
             y_ocfm = 0
         new_point = Point(x_ocfm, y_ocfm, z_ocfm, f_ocfm, type=type)
         self.add_point_to_space(new_point)
         logger.trace(f"Creating Point Opposite to Center of Mass: x={x_ocfm}, y={y_ocfm}, z={z_ocfm}, f={f_ocfm}, Type={type}")
         return new_point
 
-
     def pick_point(self, points, type):
         logger.debug(f"Picking Point (Type: {type})...")
         # Check if any of the output points are within the sense radius
         nearby_output_points = []
-        if type == 0:   
+        if type == 0:
             for o_point in self.space.output_points.values():
                 if o_point.distance_to(self.x, self.y, self.z, self.f) <= self.sense_range:
                     nearby_output_points.append(o_point)
-        
+
         if nearby_output_points:
             # If there are nearby output points, pick one of them
             return self.pick_output()
@@ -120,31 +120,31 @@ class Ant():
         pheromone_points = []
         for point in points:
             if type == 0:
-                if not(point.get_y() < self.y and point.get_z() < self.z):
+                if not (point.get_y() < self.y and point.get_z() < self.z):
                     if point.distance_to(self.x, self.y, self.z, self.f) <= self.sense_range:
                         pheromone_points.append(point)
             elif type == 1:
                 if point.distance_to(self.x, self.y, self.z, self.f) <= self.sense_range:
                     pheromone_points.append(point)
             else:
-                logger.error(f"Unexpeted Type For Picking Point: {type}")
+                logger.error(f"Unexpected Type For Picking Point: {type}")
                 exit(1)
         pheromone_center = get_center_of_mass(pheromone_points)
-        
+
         if pheromone_center is None:
             # If there are no pheromones, create a random new point
             return self.create_new_point(type)
 
         if np.random.uniform() < self.explore_rate:
-            # Explore: pick a random point within the sense radius
+            # Explore: go opposite to center to diversify
             return self.opposite_to_pheromone_center(pheromone_center, type)
         else:
-            # Exploit: choose the point with the highest pheromone level
+            # Exploit: choose the point at the center of mass
             logger.debug(f"Creating Point at Center of Mass: {pheromone_center} (Type: {type}) ...")
             new_point = Point(*pheromone_center, type=type)
             self.add_point_to_space(new_point)
             return new_point
-         
+
     def pick_input(self,):
         logger.debug("Picking INPUT")
         points_within_radius = []
@@ -153,37 +153,51 @@ class Ant():
                 points_within_radius.append(point)
         chosen_point = self.pick_point(points_within_radius, type=1)
         if chosen_point.name == "":
-            input_idx = round(chosen_point.get_x()*(len(self.space.input_names)-1))
+            input_idx = round(chosen_point.get_x() * (len(self.space.input_names) - 1))
             chosen_point.name = self.space.input_names[input_idx]
             chosen_point.name_idx = input_idx
         return chosen_point
 
     def pick_output(self,):
         logger.debug("Picking OUTPUT")
-        def __pick_point():
-            points = self.space.output_points.values()
-            if np.random.uniform() < self.explore_rate:
-                # Explore: pick a random point within the sense radius
-                point = np.random.choice(list(points), size=1)[0]
-                self.update_position(point)
-                return point
-            else:
-                # Exploit: choose the point with the highest pheromone level
-                expectation = np.random.uniform(0, max([p.get_pheromone() for p in points]))  # TODO: Adjust this value to be the max pheromone level
-                for point in points:
-                    if point.get_pheromone() > expectation:
-                        self.update_position(point)
-                        return point
-                    expectation -= point.get_pheromone()
-        return __pick_point()
+        points = list(self.space.output_points.values())
+        if not points:
+            logger.error("No output points available in space.")
+            return None
+
+        # Explore
+        if np.random.uniform() < self.explore_rate:
+            point = np.random.choice(points, size=1)[0]
+            self.update_position(point)
+            return point
+
+        # Exploit: roulette selection proportional to pheromone (robust to zeros/negatives)
+        pheromones = [max(p.get_pheromone(), 0.0) for p in points]
+        total = sum(pheromones)
+        if total <= 0:
+            # fall back to uniform if pheromones are all zero/negative
+            point = np.random.choice(points, size=1)[0]
+            self.update_position(point)
+            return point
+
+        r = np.random.uniform(0, total)
+        cumulative = 0.0
+        chosen = points[-1]
+        for p, ph in zip(points, pheromones):
+            cumulative += ph
+            if r <= cumulative:
+                chosen = p
+                break
+        self.update_position(chosen)
+        return chosen
 
     def choose_point(self,):
         points_within_radius = []
         for point in self.space.points:
             if (
-                    not(point.get_x() < self.y and point.get_z() > self.z) and 
-                    point.distance_to(self.x, self.y, self.z, self.f) <= self.sense_range
-                ):
+                not (point.get_x() < self.x and point.get_z() > self.z) and
+                point.distance_to(self.x, self.y, self.z, self.f) <= self.sense_range
+            ):
                 points_within_radius.append(point)
         chosen_point = self.pick_point(points_within_radius, type=0)
         self.x, self.y, self.z, self.f = chosen_point.coordinates()
@@ -203,7 +217,6 @@ class Ant():
         self.explore_rate = self.original_explore_rate
         self.new_points = []
         self.new_in_points = []
-
 
     """
     Setting up the Ant's Behavior using Genetic Evolution
@@ -240,9 +253,7 @@ class Ant():
                 ]
         self.best_behaviors.sort()
 
-    def evolve_behavior(
-        self,
-    ) -> None:
+    def evolve_behavior(self,) -> None:
         """
         using GA to evolve ant characteristics
         using cross over and mutations
@@ -264,7 +275,6 @@ class Ant():
             """
             perform cross over
             """
-            # new_behavior = (behavior1 + behavior2) / 2
             new_behavior = list(
                 ((np.subtract(behavior2[1:], behavior1[1:])) * np.random.random())
                 + behavior1[1:]
@@ -275,10 +285,8 @@ class Ant():
             ) = new_behavior
 
         if len(self.best_behaviors) < 10 or np.random.random() < self.mutation_sigma:
-            # print("Mutating")
             mutate()
         else:
-            # print("Crossing Over")
             indecies = np.arange(len(self.best_behaviors))
             indecies = np.random.choice(indecies, 2, replace=False)
             cross_over(

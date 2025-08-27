@@ -25,24 +25,26 @@ class Edge():
 
         if use_torch:
             self.weight = torch.tensor(weight, dtype=torch.float64, requires_grad=True)
-            # self.weight = torch.rand(1, dtype=torch.float64, requires_grad=True)
         elif weight is None:
             self.weight = np.random.uniform(-0.5, 0.5)
         else:
-            self.weight = 1.0
+            # honor provided weight (was hard-coded to 1.0 before)
+            self.weight = float(weight)
 
     def get_weight(self):
-        return self.weight.item() if isinstance(self.weight, torch.Tensor) else self.weight[0]
+        if isinstance(self.weight, torch.Tensor):
+            return self.weight.item()
+        return float(self.weight)
 
 
 class Node():
     count = 0
     def __init__(
-                    self, 
-                    type=0, 
-                    point: Point = None, 
-                    lags=None,
-                    use_torch=False,
+        self, 
+        type=0, 
+        point: Point = None, 
+        lags=None,
+        use_torch=False,
     ):
         self.id = Node.count + 1
         self.__use_torch = use_torch
@@ -66,8 +68,10 @@ class Node():
             self.functions = {0: function_dict[0]}
         else:
             self.pick_node_functions(function_dict)
-        self.adjust_lag(lags=lags-1)    # Adjust lag levels based on the z value of the point
 
+        # Adjust lag levels based on the z value of the point
+        total_lags = (lags - 1) if (lags is not None) else None
+        self.adjust_lag(lags=total_lags)
 
     def get_cluster(self):
         return self.__cluster
@@ -86,15 +90,13 @@ class Node():
             random_key = np.random.choice(list(functions.keys()))
             self.functions = {random_key: function_dict[random_key]}
 
-        
     def compare_corr(self, node):
         return  (
-                    self.point.get_x() == node.point.get_x() and 
-                    self.point.get_y() == node.point.get_y() and 
-                    self.point.get_z() == node.point.get_z()
+            self.point.get_x() == node.point.get_x() and 
+            self.point.get_y() == node.point.get_y() and 
+            self.point.get_z() == node.point.get_z()
         )
 
-    
     def pick_node_functions(self, function_dict):
         func_coord = self.point.get_f()
         func_id = (len(function_dict) - 1) * func_coord
@@ -107,16 +109,14 @@ class Node():
         else:
             prev_func_id = int(func_id - 1)
             next_func_id = int(func_id + 1)
-            # print(prev_func_id, next_func_id)   
             self.functions.update(
-                                    {
-                                        prev_func_id: function_dict[prev_func_id], 
-                                        next_func_id: function_dict[next_func_id],
-                                    }
+                {
+                    prev_func_id: function_dict[prev_func_id], 
+                    next_func_id: function_dict[next_func_id],
+                }
             )
         random_id = random.choice(list(self.functions.keys()))
         self.functions = {random_id: self.functions[random_id]}
-
 
     def add_edge(self, to_node, weight=1.0):
         edge = Edge(self, to_node, use_torch=self.__use_torch, weight=weight)
@@ -126,80 +126,101 @@ class Node():
         self.outbound_edges[to_node.id] = edge
         to_node.inbound_edges[self.id]  = edge
 
-
-    def fire (self, ):
+    def fire(self):
         results = []
         for fn_id, func in self.functions.items():
             if self.__use_torch:
-                # fn_res = torch.clamp(func(torch.stack(self.forefire)), min=-1, max=1)
                 fn_res = func(torch.stack(self.forefire))
             else:
-                # fn_res = np.clip(func(self.forefire), -3.1, 3.1)
                 fn_res = func(self.forefire)
             results.append(fn_res)
             self.node_value = torch.mean(torch.stack(results)) if self.__use_torch else np.mean(results)
-            self.d_node_value = d_function_dict[fn_id](self.node_value) if self.__use_torch else d_function_dict[fn_id](self.node_value)
-            
-        logger.debug(f"Node({self.id:5d}) is firing {self.node_value:.5f}")
+            self.d_node_value = d_function_dict[fn_id](self.node_value)
 
-        
+        # Safe logging for torch or float
+        try:
+            val = self.node_value.item() if isinstance(self.node_value, torch.Tensor) else float(self.node_value)
+            logger.debug(f"Node({self.id:5d}) is firing {val:.5f}")
+        except Exception:
+            logger.debug(f"Node({self.id:5d}) is firing {self.node_value}")
+
         for edge in self.outbound_edges.values():
             logger.debug(f"Edge ID({edge.id}) Node({edge.source.id})->Node({edge.target.id}) Weight({edge.weight})  ID:({id(edge.weight)})")
             node_value = self.node_value * edge.weight
-            if self.__use_torch: node_value.retain_grad()
+            if self.__use_torch:
+                if isinstance(node_value, torch.Tensor):
+                    node_value.retain_grad()
             edge.target.recieve_fire(node_value)
         self.recieved_fire = 0
         self.forefire = []
 
-    def recieve_fire (self, value):
-        self.recieved_fire+= 1
+    def recieve_fire(self, value):
+        self.recieved_fire += 1
         logger.debug(f"Node({self.id}) recieved fire {value}   [Signal({self.recieved_fire}/{len(self.inbound_edges)})]")
         self.forefire.append(value)
         if self.recieved_fire >= len(self.inbound_edges):
             self.fire()
 
     def update_weights(self, lr=0.001, momentum=0.1):
-        def update_weights():
+        def _update_weights_inner():
             for edge in self.inbound_edges.values():
                 edge.source.update_weights()
+                # momentum update
                 edge.velocity = momentum * edge.velocity + (edge.weight.grad if self.__use_torch else edge.grad)
-                edge.weight -= torch.clamp(lr * edge.velocity, min=-10, max=10) if self.__use_torch else lr * edge.velocity
-                edge.grad = 0.0
+                # weight step
                 if self.__use_torch:
+                    step = torch.clamp(lr * edge.velocity, min=-10, max=10)
+                    edge.weight -= step
+                else:
+                    edge.weight -= lr * edge.velocity
+                # reset grads
+                edge.grad = 0.0
+                if self.__use_torch and edge.weight.grad is not None:
                     edge.weight.grad.zero_()
 
         if self.__use_torch:
             with torch.no_grad():
-                update_weights()
+                _update_weights_inner()
         else:
-            update_weights()
-            
-            
-    def fireback (self, err=None):
+            _update_weights_inner()
+
+    def fireback(self, err=None):
         if err is not None:
             self.backfire = err
             logger.debug(f"Node({self.id}) received backfire with error {err}")
         for edge in self.inbound_edges.values():
             edge.source.recieve_backfire(self.backfire * self.d_node_value * edge.weight)
-            edge.grad+= self.backfire * edge.source.node_value * self.d_node_value
-            edge.grad = np.clip(edge.grad, -0.5, 0.5)
+            edge.grad += self.backfire * edge.source.node_value * self.d_node_value
+            # clip for stability in numpy mode
+            if not self.__use_torch:
+                edge.grad = np.clip(edge.grad, -0.5, 0.5)
         self.recieved_backfire = 0
         self.backfire = 0.0
 
-    def recieve_backfire (self, value):
-        self.recieved_backfire+= 1
-        self.backfire+= value
+    def recieve_backfire(self, value):
+        self.recieved_backfire += 1
+        self.backfire += value
         if self.recieved_backfire >= len(self.outbound_edges):
             self.fireback()
 
     def adjust_lag(self, lags):
-        segslf.lag = round(self.point.get_z() * lags)
-        self.z = self.lag / max(1,lags)
-
+        """
+        Set integer lag index based on node's z position and total lags.
+        Handles None/edge cases safely.
+        """
+        if lags is None:
+            self.lag = 0
+            self.z = 0.0
+            return
+        try:
+            lags_int = int(lags)
+        except Exception:
+            lags_int = 0
+        self.lag = int(round(self.point.get_z() * lags_int))
+        self.z = self.lag / max(1, lags_int)
 
     def get_eqn(self):
         eqn = ""
-        
         node_funs = list(self.functions.keys())
         operator = "+"
         if function_names[node_funs[0]] == "multiply":
@@ -218,21 +239,23 @@ class Node():
         return eqn
 
     def get_eqn_foactored(self, visited_nodes, max_lag):
-        if self.id in visited_nodes or self.type==1: return ""
+        if self.id in visited_nodes or self.type == 1:
+            return ""
         visited_nodes.append(self.id)
         self_name = f"N{self.id}"
-        if self.type==2: self_name = self.point.name
-        eqn=f"{self_name} = {function_names[list(self.functions.keys())[0]]}("
+        if self.type == 2:
+            self_name = self.point.name
+        eqn = f"{self_name} = {function_names[list(self.functions.keys())[0]]}("
         for edge in self.inbound_edges.values():
-            if edge.source.type==1:
+            if edge.source.type == 1:
                 node_name = edge.source.point.name + f"_{max_lag - self.lag}"
             else:
                 node_name = f"N{edge.source.id}"
-            eqn+=f"{edge.weight:.2f}*{node_name}, "
-        eqn= eqn[:-2] + ")"
-        if eqn!="": eqn+='\n'
+            w = edge.weight.item() if isinstance(edge.weight, torch.Tensor) else float(edge.weight)
+            eqn += f"{w:.2f}*{node_name}, "
+        eqn = eqn[:-2] + ")"
+        if eqn != "":
+            eqn += '\n'
         for edge in self.inbound_edges.values():
-            eqn+= edge.source.get_eqn_foactored(visited_nodes, max_lag)
-         
+            eqn += edge.source.get_eqn_foactored(visited_nodes, max_lag)
         return eqn
-        
